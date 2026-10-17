@@ -6,10 +6,12 @@ const { AppError, ValidationError } = require('../../utils/errors');
 const { multiplierAt } = require('../engine/fair');
 const config = require('../../config');
 
-
-async function placeBet(userId, stakeCents, autoCashout) {
-    const currentRound = engine.snapshot();
     
+
+async function placeBet(userId, stakeCents, autoCashout, panel = 1) {
+  try {
+    const currentRound = engine.snapshot();
+  
     if (stakeCents < config.game.minStakeCents || stakeCents > config.game.maxStakeCents) {
       throw new ValidationError('Invalid stake amount');
     }
@@ -22,8 +24,8 @@ async function placeBet(userId, stakeCents, autoCashout) {
     }
   
     const betId = crypto.randomUUID();
-    let finalBalance = 0; // Declare OUTSIDE the transaction
-  
+    let finalBalance = 0;
+
     await db.transaction(async (conn) => {
       const [gs] = await conn.query('SELECT * FROM game_state WHERE id = 1 FOR UPDATE');
       if (gs[0].phase !== 'betting' || gs[0].round_id !== currentRound.roundId) {
@@ -35,12 +37,13 @@ async function placeBet(userId, stakeCents, autoCashout) {
         throw new AppError('Insufficient balance', 400);
       }
   
+      // ✅ ADD THE PANEL COLUMN HERE
       await conn.query(
-        `INSERT INTO bets (id, round_id, user_id, stake_cents, auto_cashout, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
-        [betId, currentRound.roundId, userId, stakeCents, autoCashout || null]
+        `INSERT INTO bets (id, round_id, user_id, stake_cents, auto_cashout, status, panel) VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+        [betId, currentRound.roundId, userId, stakeCents, autoCashout || null, panel]
       );
   
-      finalBalance = user[0].balance_cents - stakeCents; // Assign to outer variable
+      finalBalance = user[0].balance_cents - stakeCents;
       await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [finalBalance, userId]);
       await conn.query(
         `INSERT INTO ledger (user_id, kind, amount_cents, balance_after_cents, idempotency_key) VALUES (?, 'stake', ?, ?, ?)`,
@@ -58,11 +61,19 @@ async function placeBet(userId, stakeCents, autoCashout) {
     const io = getIO();
     if (io) {
       io.emit('live_bet_update');
-      io.to(`user:${userId}`).emit('wallet', { balanceCents: finalBalance }); // Now works!
+      io.to(`user:${userId}`).emit('wallet', { balanceCents: finalBalance });
     }
   
-    return { id: betId, roundId: currentRound.roundId, stakeCents, status: 'pending' };
+    return { id: betId, roundId: currentRound.roundId, stakeCents, status: 'pending', panel };
+    
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      throw new Error('You have already placed a bet in this panel for this round.');
+    }
+    throw error;
   }
+}
+
 
   async function cashOut(userId, roundId, betId, targetMultiplier = null) {
     let cashoutResult = null;

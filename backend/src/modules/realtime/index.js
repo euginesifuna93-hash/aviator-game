@@ -45,22 +45,23 @@ function initRealtime(httpServer, sessionMiddleware) {
 
     // Add this inside the ioInstance.on('connection', ...) callback, after the snapshot emit:
 
-socket.on('bet:place', async (payload, ack) => {
-    try {
-      const userId = socket.request.session?.userId;
-      if (!userId) {
-        return ack({ ok: false, error: 'Not authenticated' });
+    socket.on('bet:place', async (payload, ack) => {
+      try {
+        const userId = socket.request.session?.userId;
+        if (!userId) {
+          return ack({ ok: false, error: 'Not authenticated' });
+        }
+        
+        const betsService = require('../bets/service');
+        // Pass the panel number (1 or 2) to the service
+        const bet = await betsService.placeBet(userId, payload.stakeCents, payload.autoCashout, payload.panel); 
+        
+        ack({ ok: true, bet });
+      } catch (err) {
+        console.error('bet:place error:', err.message);
+        ack({ ok: false, error: err.message || 'Bet failed' });
       }
-      
-      const betsService = require('../bets/service');
-      const bet = await betsService.placeBet(userId, payload.stakeCents, payload.autoCashout);
-      
-      ack({ ok: true, bet });
-    } catch (err) {
-      console.error('bet:place error:', err.message);
-      ack({ ok: false, error: err.message || 'Bet failed' });
-    }
-  });
+    });
   
   socket.on('bet:cashout', async (payload, ack) => {
     try {

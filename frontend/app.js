@@ -329,9 +329,10 @@ function handleBetAction(panelNum) {
     }
 
     const stakeCents = Math.round(stake * 100);
-    console.log('Emitting bet:place with stakeCents:', stakeCents);
+    console.log('Emitting bet:place with stakeCents:', stakeCents, 'Panel:', panelNum);
     
-    socket.emit('bet:place', { stakeCents }, (res) => {
+    // ✅ ADD panel: panelNum HERE
+    socket.emit('bet:place', { stakeCents, panel: panelNum }, (res) => {
       console.log('Bet response received:', res);
       if (res && res.ok) {
         bet.placed = true;
@@ -382,7 +383,8 @@ function handleBetAction(panelNum) {
 
 function doCancel(panelNum, stake) {
   console.log('Canceling bet for panel', panelNum);
-  socket.emit('bet:cancel', { roundId: gameState.roundId }, (res) => {
+  // ✅ Send the specific betId so it cancels the right panel's bet
+  socket.emit('bet:cancel', { roundId: gameState.roundId, betId: bets[panelNum].id }, (res) => {
     console.log('Cancel response:', res);
     if (res && res.ok) {
       bets[panelNum].placed = false;
