@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aviator Master Admin</title>
+  <link rel="stylesheet" href="/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+  <div class="admin-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-icon">✈️</span>
+        <span class="logo-text">AVIATOR</span>
+      </div>
+      <div class="logo-sub">Master Control</div>
+      
+      <nav class="nav">
+        <button class="nav-btn active" data-tab="live-game">🎮 Live Game Monitor</button>
+        <button class="nav-btn" data-tab="financials">💰 Financial Dashboard</button>
+        <button class="nav-btn" data-tab="withdrawals">🏦 Pending Withdrawals <span class="badge" id="pending-badge">0</span></button>
+        <button class="nav-btn" data-tab="users">👥 User Management</button>
+        <button class="nav-btn" data-tab="transactions">📜 All Transactions</button>
+        <button class="nav-btn" data-tab="game-settings">⚙️ Game Settings</button>
+        
+        <button class="nav-btn" data-tab="recommendations">💡 Recommendations</button>
+      </nav>
+      <div class="admin-user">
+        <div class="admin-email" id="admin-email">Loading...</div>
+        
+        <!-- ✅ UPDATED: Now includes ?view=game parameter -->
+        <button class="btn-back-game" onclick="window.location.href='/?view=game'"> Back to Game</button>
+        
+        <button class="btn-logout" id="btn-logout">Logout</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- TAB 1: LIVE GAME MONITOR (The old features) -->
+      <div class="tab-content active" id="tab-live-game">
+        <div class="header"><h1> Live Game Engine</h1><button class="btn-refresh" id="btn-refresh-game">🔄 Refresh</button></div>
+        
+        <div class="stats-grid-4">
+          <div class="stat-card blue"><div class="stat-label">Current Round</div><div class="stat-value" id="lg-round">—</div></div>
+          <div class="stat-card purple"><div class="stat-label">Phase</div><div class="stat-value" id="lg-phase">—</div></div>
+          <div class="stat-card pink"><div class="stat-label">Next Crash Point</div><div class="stat-value" id="lg-crash">—</div></div>
+          <div class="stat-card orange"><div class="stat-label">Time Left / Progress</div><div class="stat-value" id="lg-time">—</div></div>
+        </div>
+
+        <div class="section-card">
+          <h3>Recent Rounds History</h3>
+          <div class="rounds-grid" id="rounds-grid">
+            <div class="loading">Loading rounds...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: FINANCIAL DASHBOARD -->
+      <div class="tab-content" id="tab-financials">
+        <div class="header"><h1>💰 Financial Overview</h1><button class="btn-refresh" id="btn-refresh-fin">🔄 Refresh</button></div>
+        
+        <div class="stats-grid">
+          <div class="stat-card green"><div class="stat-label">Money In (Deposits)</div><div class="stat-value" id="fin-money-in">0.00</div><div class="stat-unit">KES</div></div>
+          <div class="stat-card red"><div class="stat-label">Money Out (Withdrawals)</div><div class="stat-value" id="fin-money-out">0.00</div><div class="stat-unit">KES</div></div>
+          <div class="stat-card purple"><div class="stat-label">House Profit</div><div class="stat-value" id="fin-profit">0.00</div><div class="stat-unit">KES</div></div>
+          <div class="stat-card orange"><div class="stat-label">Pending Liability</div><div class="stat-value" id="fin-pending">0.00</div><div class="stat-unit">KES</div></div>
+          <div class="stat-card blue"><div class="stat-label">Total Bets</div><div class="stat-value" id="fin-bets">0</div></div>
+          <div class="stat-card cyan"><div class="stat-label">Total Users</div><div class="stat-value" id="fin-users">0</div></div>
+          <div class="stat-card pink"><div class="stat-label">Active (10m)</div><div class="stat-value" id="fin-active">0</div></div>
+          <div class="stat-card yellow"><div class="stat-label">User Balances (Liability)</div><div class="stat-value" id="fin-liability">0.00</div><div class="stat-unit">KES</div></div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card"><h3>Revenue Flow (Last 7 Days)</h3><canvas id="revenueChart"></canvas></div>
+          <div class="chart-card"><h3>Profit vs Player Winnings</h3><canvas id="profitChart"></canvas></div>
+        </div>
+
+        <div class="section-card">
+          <h3>🕐 Recent Activity Feed</h3>
+          <div class="activity-list" id="activity-list"><div class="loading">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: PENDING WITHDRAWALS -->
+      <div class="tab-content" id="tab-withdrawals">
+        <div class="header"><h1>🏦 Pending Withdrawals</h1></div>
+        <div class="section-card">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>M-Pesa</th><th>Reference</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody id="withdrawals-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: USER MANAGEMENT -->
+      <div class="tab-content" id="tab-users">
+        <div class="header"><h1>👥 User Management</h1></div>
+        <div class="section-card">
+          <div class="filter-bar"><input type="text" id="user-search" placeholder="Search by email..."></div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>Email</th><th>Balance</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+              <tbody id="users-body"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: ALL TRANSACTIONS -->
+      <div class="tab-content" id="tab-transactions">
+        <div class="header"><h1> All Transactions</h1></div>
+        <div class="section-card">
+          <div class="filter-bar">
+            <select id="filter-kind"><option value="">All Types</option><option value="deposit">Deposits</option><option value="withdrawal">Withdrawals</option><option value="stake">Bets</option><option value="cashout">Cashouts</option></select>
+            <select id="filter-status"><option value="">All Status</option><option value="completed">Completed</option><option value="pending">Pending</option></select>
+            <input type="text" id="filter-email" placeholder="Search email...">
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>ID</th><th>User</th><th>Type</th><th>Amount</th><th>Balance After</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody id="transactions-body"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+           <!-- GAME SETTINGS TAB -->
+           <div class="tab-content" id="tab-game-settings">
+            <div class="header">
+              <h1>⚙️ Game Settings</h1>
+              <button class="btn-refresh" id="btn-refresh-settings">🔄 Refresh</button>
+            </div>
+            
+            <div class="section-card">
+              <h3>Control Game Distribution & Limits</h3>
+              <p class="section-desc">Adjust how often high multipliers appear and set betting limits</p>
+              
+              <form id="game-settings-form" style="display: grid; gap: 20px; max-width: 600px;">
+                <div>
+                  <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">House Edge (%)</label>
+                  <input type="number" id="setting-house-edge" step="0.01" min="0.01" max="100" style="width: 100%; padding: 10px; background: #0a0a12; border: 1px solid #2a2a3e; color: #fff; border-radius: 8px;">                  <small style="color: #666;">Higher = more profit for house, lower multipliers (default: 3%)</small>
+                </div>
+                
+                <div>
+                  <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">Maximum Crash Point (x)</label>
+                  <input type="number" id="setting-max-crash" step="1" min="10" max="10000" style="width: 100%; padding: 10px; background: #0a0a12; border: 1px solid #2a2a3e; color: #fff; border-radius: 8px;">
+                  <small style="color: #666;">Absolute maximum multiplier (default: 1000x)</small>
+                </div>
+                
+                <div>
+                  <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">Minimum Bet (KES)</label>
+                  <input type="number" id="setting-min-bet" step="1" min="1" style="width: 100%; padding: 10px; background: #0a0a12; border: 1px solid #2a2a3e; color: #fff; border-radius: 8px;">
+                </div>
+                
+                <div>
+                  <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">Maximum Bet (KES)</label>
+                  <input type="number" id="setting-max-bet" step="1" min="100" style="width: 100%; padding: 10px; background: #0a0a12; border: 1px solid #2a2a3e; color: #fff; border-radius: 8px;">
+                </div>
+                
+                <div>
+                  <label style="display: block; margin-bottom: 8px; color: #aaa; font-size: 14px;">Betting Time (seconds)</label>
+                  <input type="number" id="setting-betting-time" step="1" min="5" max="30" style="width: 100%; padding: 10px; background: #0a0a12; border: 1px solid #2a2a3e; color: #fff; border-radius: 8px;">
+                  <small style="color: #666;">How long players have to place bets (default: 11s)</small>
+                </div>
+                
+                <button type="submit" class="btn-action btn-approve" style="padding: 12px 24px; font-size: 14px; width: fit-content; margin-top: 10px;">💾 Save Settings</button>
+              </form>
+            </div>
+          </div>
+    </main>
+  </div>
+  <script src="/admin.js"></script>
+</body>
+</html>
