@@ -287,25 +287,11 @@ function handleBetAction(panelNum) {
   console.log('User balance:', currentUser?.balanceCents);
 
   // 1. CANCEL during betting phase
+  // 1. CANCEL during betting phase (INSTANT TOGGLE)
   if (gameState.phase === 'betting' && bet.placed && bet.status === 'pending') {
-    console.log('→ Action: CANCEL bet');
-    
-    if (typeof Swal !== 'undefined') {
-      Swal.fire({
-        title: 'Cancel Bet?',
-        html: `Refund <strong>${stake.toFixed(2)} KES</strong>?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, Cancel',
-        cancelButtonText: 'Keep Bet',
-        confirmButtonColor: '#ef4444',
-        customClass: { popup: 'aviator-swal' },
-      }).then((result) => {
-        if (result.isConfirmed) doCancel(panelNum, stake);
-      });
-    } else {
-      if (confirm(`Cancel bet of ${stake.toFixed(2)} KES?`)) doCancel(panelNum, stake);
-    }
+    console.log('→ Action: CANCEL bet (Instant)');
+    // Just cancel immediately without asking!
+    doCancel(panelNum, stake);
     return;
   }
 
