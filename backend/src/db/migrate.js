@@ -6,6 +6,14 @@ const mysql = require('mysql2/promise');
 
 const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
+
+console.log('DB Config:', {
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  database: process.env.DB_NAME
+});
+
 async function run() {
   // Use a single connection (not the pool) for migrations
   const conn = await mysql.createConnection({

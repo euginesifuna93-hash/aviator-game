@@ -1,6 +1,6 @@
 -- 001_initial.sql
 -- Foundation schema for Aviator
-
+   SET FOREIGN_KEY_CHECKS=0;
 -- ---------- Users ----------
 CREATE TABLE IF NOT EXISTS users (
   id CHAR(36) NOT NULL PRIMARY KEY,          -- UUID v4, fixed size = faster than VARCHAR
@@ -86,3 +86,4 @@ CREATE TABLE IF NOT EXISTS _migrations (
   name VARCHAR(128) NOT NULL PRIMARY KEY,
   applied_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+   SET FOREIGN_KEY_CHECKS=1;

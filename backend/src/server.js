@@ -42,6 +42,7 @@ app.use((req, res, next) => {
   const allowedOrigins = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://aviator-backend-huxs.onrender.com', // <-- ADD THIS LINE
     config.app.origin,
   ];
 
@@ -71,9 +72,9 @@ const sessionConfig = {
   saveUninitialized: false,
   name: 'aviator.sid',
   cookie: {
-    secure: false,
+    secure: config.isProd, // <-- CHANGE THIS (true in production)
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: config.isProd ? 'none' : 'lax', // <-- CHANGE THIS
     maxAge: config.auth.sessionTtlHours * 60 * 60 * 1000,
   },
 };

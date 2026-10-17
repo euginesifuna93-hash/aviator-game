@@ -1,6 +1,9 @@
 // frontend/app.js
 const API_BASE = '/api/auth';
-let socket = null;
+
+// Initialize socket to connect to the current domain automatically
+let socket = io(); 
+
 let currentUser = null;
 
 const gameState = {
