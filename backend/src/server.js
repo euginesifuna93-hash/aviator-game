@@ -72,9 +72,9 @@ const sessionConfig = {
   saveUninitialized: false,
   name: 'aviator.sid',
   cookie: {
-    secure: config.isProd, // <-- CHANGE THIS (true in production)
+    secure: config.isProd,  // Should be TRUE in production
     httpOnly: true,
-    sameSite: config.isProd ? 'none' : 'lax', // <-- CHANGE THIS
+    sameSite: config.isProd ? 'none' : 'lax',  // Should be 'none' in production
     maxAge: config.auth.sessionTtlHours * 60 * 60 * 1000,
   },
 };
