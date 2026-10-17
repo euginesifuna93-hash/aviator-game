@@ -6,10 +6,16 @@ const engine = require('../engine/engine');
 let ioInstance = null;
 
 function initRealtime(httpServer, sessionMiddleware) {
+ 
+ 
   ioInstance = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || origin.includes('localhost') || origin.includes('ngrok') || origin.includes('127.0.0.1')) {
+        if (!origin || 
+            origin.includes('localhost') || 
+            origin.includes('ngrok') || 
+            origin.includes('127.0.0.1') ||
+            origin.includes('onrender.com')) { // <--- ADD THIS LINE!
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));

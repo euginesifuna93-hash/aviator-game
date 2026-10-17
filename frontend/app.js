@@ -3,8 +3,11 @@ const API_BASE = '/api/auth';
 
 // Initialize socket to connect to the current domain automatically
 let socket = io({
-  withCredentials: true,  // This sends the session cookie with every request
-  transports: ['websocket', 'polling']  // Try websocket first, fallback to polling
+  withCredentials: true,
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000
 });
 
 let currentUser = null;
