@@ -160,21 +160,23 @@ async function getHistory(userId) {
 
 
 
-async function cancelBet(userId, roundId) {
-    let finalBalance = 0; // Declare OUTSIDE
-    
-    await db.transaction(async (conn) => {
-      const [gs] = await conn.query('SELECT * FROM game_state WHERE id = 1 FOR UPDATE');
-      if (gs[0].phase !== 'betting' || gs[0].round_id !== roundId) {
-        throw new AppError('Betting closed', 400);
-      }
+async function cancelBet(userId, roundId, betId) { // <--- Added betId here
+  let finalBalance = 0; 
   
-      const [bet] = await conn.query(
-        `SELECT * FROM bets WHERE user_id = ? AND round_id = ? AND status = 'pending' FOR UPDATE`,
-        [userId, roundId]
-      );
-      if (bet.length === 0) throw new AppError('No active bet', 404);
-  
+  await db.transaction(async (conn) => {
+    const [gs] = await conn.query('SELECT * FROM game_state WHERE id = 1 FOR UPDATE');
+    if (gs[0].phase !== 'betting' || gs[0].round_id !== roundId) {
+      throw new AppError('Betting closed', 400);
+    }
+
+    // Update this query to look for the specific betId!
+    const [bet] = await conn.query(
+      `SELECT * FROM bets WHERE id = ? AND user_id = ? AND round_id = ? AND status = 'pending' FOR UPDATE`,
+      [betId, userId, roundId] // <--- Added betId here
+    );
+    if (bet.length === 0) throw new AppError('No active bet', 404);
+
+    // ... (keep the rest of the function exactly as it was) ...
       const [user] = await conn.query('SELECT balance_cents FROM users WHERE id = ? FOR UPDATE', [userId]);
       finalBalance = Number(user[0].balance_cents) + Number(bet[0].stake_cents); // Assign here
       await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [finalBalance, userId]);

@@ -381,9 +381,10 @@ function handleBetAction(panelNum) {
   }
 }
 
+
 function doCancel(panelNum, stake) {
   console.log('Canceling bet for panel', panelNum);
-  // ✅ Send the specific betId so it cancels the right panel's bet
+  // Send the specific betId so the backend knows which panel to cancel
   socket.emit('bet:cancel', { roundId: gameState.roundId, betId: bets[panelNum].id }, (res) => {
     console.log('Cancel response:', res);
     if (res && res.ok) {

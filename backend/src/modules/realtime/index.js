@@ -80,6 +80,7 @@ function initRealtime(httpServer, sessionMiddleware) {
     }
   });
   
+
   socket.on('bet:cancel', async (payload, ack) => {
     try {
       const userId = socket.request.session?.userId;
@@ -88,7 +89,8 @@ function initRealtime(httpServer, sessionMiddleware) {
       }
       
       const betsService = require('../bets/service');
-      const result = await betsService.cancelBet(userId, payload.roundId);
+      // Pass the betId here!
+      const result = await betsService.cancelBet(userId, payload.roundId, payload.betId); 
       
       ack({ ok: true, ...result });
     } catch (err) {
