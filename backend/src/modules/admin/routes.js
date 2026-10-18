@@ -348,25 +348,24 @@ router.get('/game-settings', requireAuth, requireAdmin, async (req, res, next) =
   }
 });
 // PUT /api/admin/game-settings
-router.put('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
+// Example: router.get('/settings', async (req, res) => { ... })
+router.get('/settings', async (req, res) => {
   try {
-    const { house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed } = req.body;
+    const [rows] = await db.query('SELECT * FROM game_settings');
     
-    await db.query(`
-      INSERT INTO game_settings (id, house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed)
-      VALUES (1, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE 
-        house_edge = VALUES(house_edge),
-        max_crash = VALUES(max_crash),
-        min_bet = VALUES(min_bet),
-        max_bet = VALUES(max_bet),
-        betting_time = VALUES(betting_time),
-        flight_speed = VALUES(flight_speed)
-    `, [house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed]);
-    
-    logger.info('Game settings updated by admin');
-    res.json({ ok: true, message: 'Game settings updated' });
-  } catch (err) { next(err); }
+    // Transform the database rows into a simple object
+    // This turns [{setting_key: 'min_bet', setting_value: '100'}, ...] 
+    // into { min_bet: '100', max_bet: '2500000', ... }
+    const settingsObject = {};
+    rows.forEach(row => {
+      settingsObject[row.setting_key] = row.setting_value;
+    });
+
+    res.json({ ok: true, settings: settingsObject });
+  } catch (err) {
+    console.error('Settings error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET ALL USERS FOR MANAGEMENT

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CHAPAA</title>
+  
+  <!-- Add this line for Paystack Popup -->
+<script src="https://js.paystack.co/v1/inline.js"></script><link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="auth-screen">
+    <div class="auth-box">
+      <h1 class="logo">AVIATOR</h1>
+      <p class="subtitle">Sign in to play</p>
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Password (min 8 chars)" />
+      <button id="btn-login" class="btn-primary">Login</button>
+      <button id="btn-register" class="btn-secondary">Create Account</button>
+      <p id="auth-msg" class="auth-msg"></p>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div id="game-screen" class="game-screen" style="display:none;">
+    
+    <!-- Top Bar with Balance -->
+    <header class="top-bar">
+      <div class="balance-display">
+        <div class="balance-label-small">Balance</div>
+        <div class="balance-value-large"><span id="user-balance">0.00</span> KES</div>
+      </div>
+      <div class="top-bar-actions">
+        <button id="btn-profile" class="btn-profile">
+          <span class="profile-icon">👤</span>
+          <span class="profile-text">Profile</span>
+        </button>
+        <span class="live-badge" style="background:#00a86b;">LIVE</span>      </div>
+    </header>
+
+    <!-- Upcoming Banner -->
+    <div class="upcoming-banner">
+      <span class="upcoming-label"> UPCOMING</span>
+      <span class="upcoming-text">Mfalme Wa Anga KES 400,000 Daily Crown</span>
+      <span class="upcoming-arrow">→</span>
+    </div>
+
+    <div class="main-layout">
+      
+      <!-- Left Sidebar: Live Bets -->
+      <aside class="sidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active" data-tab="all">All Bets</button>
+          <button class="sidebar-tab" data-tab="previous">Previous</button>
+          <button class="sidebar-tab" data-tab="top">Top</button>
+        </div>
+        <div class="sidebar-stats">
+          <div class="stats-left">
+            <div class="stats-title">ALL BETS</div>
+            <div class="stats-count" id="live-count">0</div>
+          </div>
+          <div class="stats-right">
+            <div class="stats-title">Total win KES</div>
+            <div class="stats-total" id="total-win">0.00</div>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="live-bets-table">
+          <div class="table-header">
+            <span>Player</span><span>Bet KES</span><span>X</span><span>Win KES</span>
+          </div>
+          <div id="live-bets-list" class="table-body"></div>
+        </div>
+        <div class="sidebar-footer">
+          <span>🛡️ Provably Fair Game</span>
+          <span>Powered by <strong>SPRIBE</strong></span>
+        </div>
+      </aside>
+
+      <!-- Center: Game Area -->
+      <main class="game-area">
+        
+        <!-- History Bar (ABOVE canvas) -->
+        <div id="history-bar" class="history-bar"></div>
+
+        <!-- Canvas Container -->
+        <div class="canvas-container">
+          <canvas id="game-canvas"></canvas>
+          <div class="multiplier-overlay">
+            <div id="multiplier" class="multiplier">1.00x</div>
+          </div>
+          <div class="players-count">
+            <div class="avatars-small">
+              <span class="avatar-sm"></span>
+              <span class="avatar-sm">🚀</span>
+              <span class="avatar-sm">✈️</span>
+            </div>
+            <span id="players-count-num">0</span>
+          </div>
+          <div id="status" class="status-text">Waiting for next round...</div>
+        </div>
+
+        <!-- Two Bet Panels -->
+        <div class="bet-panels">
+          <div class="bet-panel" id="panel-1">
+            <div class="panel-tabs">
+              <button class="tab active">Bet</button>
+              <button class="tab">Auto</button>
+            </div>
+            <div class="panel-body">
+              <div class="stake-control">
+                <button class="stake-btn minus" data-panel="1">−</button>
+                <input type="number" class="stake-input" id="stake-1" value="10.00" step="1" />
+                <button class="stake-btn plus" data-panel="1">+</button>
+              </div>
+              <div class="presets">
+                <button class="preset" data-panel="1" data-value="100">100</button>
+                <button class="preset" data-panel="1" data-value="250">250</button>
+                <button class="preset" data-panel="1" data-value="1000">1,000</button>
+                <button class="preset" data-panel="1" data-value="25000">25,000</button>
+              </div>
+              <button class="cashout-btn bet-mode" id="btn-action-1">
+                <span class="cashout-label">Bet</span>
+                <span class="cashout-amount" id="cashout-amount-1">10.00 KES</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bet-panel" id="panel-2">
+            <div class="panel-tabs">
+              <button class="tab active">Bet</button>
+              <button class="tab">Auto</button>
+            </div>
+            <div class="panel-body">
+              <div class="stake-control">
+                <button class="stake-btn minus" data-panel="2">−</button>
+                <input type="number" class="stake-input" id="stake-2" value="10.00" step="1" />
+                <button class="stake-btn plus" data-panel="2">+</button>
+              </div>
+              <div class="presets">
+                <button class="preset" data-panel="2" data-value="100">100</button>
+                <button class="preset" data-panel="2" data-value="250">250</button>
+                <button class="preset" data-panel="2" data-value="1000">1,000</button>
+                <button class="preset" data-panel="2" data-value="25000">25,000</button>
+              </div>
+              <button class="cashout-btn bet-mode" id="btn-action-2">
+                <span class="cashout-label">Bet</span>
+                <span class="cashout-amount" id="cashout-amount-2">10.00 KES</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- User Info Bar -->
+    <div class="user-bar">
+      <span id="user-info">Loading...</span>
+      <button id="btn-logout" class="btn-logout">Logout</button>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL (Only ONE, shown via JS) -->
+  <div id="admin-panel" class="admin-panel" style="display:none;">
+    <div class="admin-header">
+      <h2>🔐 Admin Panel</h2>
+      <button id="admin-toggle" class="admin-toggle">▼</button>
+    </div>
+    <div class="admin-content" id="admin-content">
+      <div class="admin-section">
+        <h3>Next Crash Point</h3>
+        <div class="crash-display">
+          <div class="crash-value" id="admin-crash-point">—</div>
+          <div class="crash-label">Predetermined crash multiplier</div>
+        </div>
+        <div class="admin-stats">
+          <div class="stat">
+            <div class="stat-label">Round</div>
+            <div class="stat-value" id="admin-round-id">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Phase</div>
+            <div class="stat-value" id="admin-phase">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Time Left</div>
+            <div class="stat-value" id="admin-time-left">—</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Flight Progress</div>
+            <div class="stat-value" id="admin-progress">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="admin-section">
+        <h3> Recent Rounds</h3>
+        <div id="admin-rounds-list" class="admin-rounds-list"></div>
+      </div>
+      <!-- Inside the admin-panel div, add this tab navigation -->
+<div class="admin-tabs" style="display:flex; gap:8px; padding:0 16px 12px; border-bottom:1px solid #2a2a35;">
+  <button class="admin-tab-btn active" data-admin-tab="game">🎮 Game State</button>
+  <button class="admin-tab-btn" data-admin-tab="financials">📊 Financials</button>
+</div>
+    </div>
+  </div>
+  <!-- FINANCIALS TAB CONTENT -->
+<div class="admin-content" id="admin-tab-financials" style="display:none;">
+  <div class="admin-stats-grid">
+    <div class="admin-stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-info">
+        <div class="stat-label">Total Deposits</div>
+        <div class="stat-value green" id="fin-deposits">0.00</div>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="stat-icon">💸</div>
+      <div class="stat-info">
+        <div class="stat-label">Total Withdrawals</div>
+        <div class="stat-value red" id="fin-withdrawals">0.00</div>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="stat-icon">🎲</div>
+      <div class="stat-info">
+        <div class="stat-label">Total Staked</div>
+        <div class="stat-value blue" id="fin-staked">0.00</div>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="stat-icon">🏆</div>
+      <div class="stat-info">
+        <div class="stat-label">Total Cashed Out</div>
+        <div class="stat-value yellow" id="fin-cashed">0.00</div>
+      </div>
+    </div>
+    <div class="admin-stat-card highlight">
+      <div class="stat-icon">📈</div>
+      <div class="stat-info">
+        <div class="stat-label">House Profit</div>
+        <div class="stat-value" id="fin-profit">0.00</div>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="stat-icon">🏦</div>
+      <div class="stat-info">
+        <div class="stat-label">User Balances (Liability)</div>
+        <div class="stat-value purple" id="fin-liability">0.00</div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:20px; font-size:14px; color:#888; text-transform:uppercase; letter-spacing:1px;">Recent Activity</h3>
+  <div class="admin-activity-list" id="admin-activity-list">
+    <div style="text-align:center; padding:20px; color:#666;">Loading...</div>
+  </div>
+</div>
+
+  <!-- PROFILE MODAL (Only ONE instance) -->
+  <div id="profile-modal" class="modal-overlay" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title-area">
+          <h2>👤 My Profile</h2>
+          <p class="modal-subtitle">Manage your account and funds</p>
+        </div>
+        <button id="modal-close" class="modal-close">✕</button>
+      </div>
+      
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-tab="profile">
+          <span class="tab-icon">👤</span>
+          <span>Profile</span>
+        </button>
+        <button class="modal-tab" data-tab="deposit">
+          <span class="tab-icon">💰</span>
+          <span>Deposit</span>
+        </button>
+        <button class="modal-tab" data-tab="withdraw">
+          <span class="tab-icon">💸</span>
+          <span>Withdraw</span>
+        </button>
+        <button class="modal-tab" data-tab="history">
+          <span class="tab-icon">📊</span>
+          <span>History</span>
+        </button>
+      </div>
+
+      <!-- PROFILE TAB -->
+      <div class="modal-content active-tab" id="tab-profile">
+        <div class="profile-balance-card">
+          <div class="balance-top-row">
+            <div>
+              <div class="balance-label">Available Balance</div>
+              <div class="balance-amount" id="profile-balance">0.00 KES</div>
+            </div>
+            <div class="balance-icon">💵</div>
+          </div>
+          <div class="balance-divider"></div>
+          <div class="balance-email-row">
+            <span class="balance-email-label">Account:</span>
+            <span class="balance-email" id="profile-email">—</span>
+          </div>
+        </div>
+        
+        <form id="profile-form" class="modal-form">
+          <h3 class="section-title">Account Settings</h3>
+          <div class="form-group">
+            <label>Email Address</label>
+            <input type="email" id="profile-email-input" required />
+          </div>
+          <div class="form-divider">
+            <span>Change Password</span>
+          </div>
+          <div class="form-group">
+            <label>Current Password</label>
+            <input type="password" id="profile-current-pw" placeholder="Required to change password" />
+          </div>
+          <div class="form-group">
+            <label>New Password</label>
+            <input type="password" id="profile-new-pw" minlength="8" placeholder="Min 8 characters" />
+          </div>
+          <button type="submit" class="btn-submit btn-primary-large">💾 Save Changes</button>
+          <div id="profile-msg" class="form-msg"></div>
+        </form>
+      </div>
+
+      <!-- DEPOSIT TAB -->
+      <div class="modal-content hidden-tab" id="tab-deposit">
+        <div class="info-banner">
+          <div class="info-icon">💡</div>
+          <div>
+            <div class="info-title">Instant Deposit</div>
+            <div class="info-text">Minimum deposit: <strong>100 KES</strong>. Funds added instantly.</div>
+          </div>
+        </div>
+        <form id="deposit-form" class="modal-form">
+          <h3 class="section-title">Add Funds</h3>
+          <div class="form-group">
+            <label>Amount (KES)</label>
+            <input type="number" id="deposit-amount" min="100" step="1" placeholder="Enter amount (min 100)" required />
+            <div class="quick-amounts">
+              <button type="button" class="quick-amount" data-amount="100">100</button>
+              <button type="button" class="quick-amount" data-amount="500">500</button>
+              <button type="button" class="quick-amount" data-amount="1000">1,000</button>
+              <button type="button" class="quick-amount" data-amount="5000">5,000</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select id="deposit-method" required>
+              <option value="mpesa">📱 M-Pesa</option>
+              <option value="bank">🏦 Bank Transfer</option>
+              <option value="card">💳 Card</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-submit btn-deposit-large">💰 Deposit Now</button>
+          <div id="deposit-msg" class="form-msg"></div>
+        </form>
+      </div>
+
+      <!-- WITHDRAW TAB -->
+      <div class="modal-content hidden-tab" id="tab-withdraw">
+        <div class="info-banner warning">
+          <div class="info-icon">⚠️</div>
+          <div>
+            <div class="info-title">Withdrawal Request</div>
+            <div class="info-text">Minimum: <strong>100 KES</strong>. Processing: instant (demo).</div>
+          </div>
+        </div>
+        <form id="withdraw-form" class="modal-form">
+          <h3 class="section-title">Request Withdrawal</h3>
+          <div class="form-group">
+            <label>Amount (KES)</label>
+            <input type="number" id="withdraw-amount" min="100" step="1" placeholder="Enter amount (min 100)" required />
+            <div class="quick-amounts">
+              <button type="button" class="quick-amount" data-amount="100">100</button>
+              <button type="button" class="quick-amount" data-amount="500">500</button>
+              <button type="button" class="quick-amount" data-amount="1000">1,000</button>
+              <button type="button" class="quick-amount" data-amount="5000">5,000</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Withdrawal Method</label>
+            <select id="withdraw-method" required>
+              <option value="mpesa">📱 M-Pesa</option>
+              <option value="bank">🏦 Bank Transfer</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Account / Phone Number</label>
+            <input type="text" id="withdraw-account" placeholder="e.g. 0712345678" required />
+          </div>
+          <button type="submit" class="btn-submit btn-withdraw-large">💸 Withdraw Now</button>
+          <div id="withdraw-msg" class="form-msg"></div>
+        </form>
+      </div>
+
+      <!-- HISTORY TAB -->
+      <div class="modal-content hidden-tab" id="tab-history">
+        <h3 class="section-title">Transaction History</h3>
+        <div id="transactions-list" class="transactions-list">
+          <div class="empty-state">Loading transactions...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+<!-- SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
