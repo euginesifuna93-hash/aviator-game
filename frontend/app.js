@@ -632,7 +632,6 @@ if (btnProfile && profileModal && modalClose) {
   });
 }
 
-
 async function loadProfileData() {
   console.log('=== LOADING PROFILE DATA ===');
   try {
@@ -650,43 +649,52 @@ async function loadProfileData() {
     const emailEl = document.getElementById('profile-email');
     const emailInput = document.getElementById('profile-email-input');
     
-    if (balEl) {
-      const balance = (data.user.balance_cents / 100).toFixed(2);
+    // ✅ FIX: Use camelCase balanceCents (not snake_case)
+    if (balEl && data.user.balanceCents !== undefined) {
+      const balance = (data.user.balanceCents / 100).toFixed(2);
       balEl.textContent = `${balance} KES`;
+      console.log('Balance set to:', balance);
+    } else {
+      console.error('Balance not found in response:', data.user);
     }
     
     if (emailEl) emailEl.textContent = data.user.email;
     if (emailInput) emailInput.value = data.user.email;
 
-    // --- NEW: WAGERING PROGRESS BAR LOGIC ---
+    // --- WAGERING PROGRESS BAR LOGIC ---
     const wageringEl = document.getElementById('wagering-progress-container');
-    if (wageringEl && data.user.wagering_required_cents > 0) {
-      const totalRequired = 3000; // 30 KES (10 KES bonus * 3)
-      const completed = Math.max(0, totalRequired - data.user.wagering_required_cents);
-      const percentage = Math.min(100, (completed / totalRequired) * 100).toFixed(0);
-      const remainingKES = (data.user.wagering_required_cents / 100).toFixed(2);
+    if (wageringEl) {
+      // ✅ FIX: Check if wageringRequiredCents exists
+      const wageringRequired = data.user.wageringRequiredCents || 0;
       
-      wageringEl.innerHTML = `
-        <div style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #FF8552;">
-          <div style="font-size: 13px; color: #FBF12; font-weight: 600; margin-bottom: 6px;">
-            🔒 Bonus Wagering: ${percentage}% Complete
+      if (wageringRequired > 0) {
+        const totalRequired = 3000; // 30 KES (10 KES bonus * 3)
+        const completed = Math.max(0, totalRequired - wageringRequired);
+        const percentage = Math.min(100, (completed / totalRequired) * 100).toFixed(0);
+        const remainingKES = (wageringRequired / 100).toFixed(2);
+        
+        wageringEl.innerHTML = `
+          <div style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #FF8552;">
+            <div style="font-size: 13px; color: #FBF12; font-weight: 600; margin-bottom: 6px;">
+              🔒 Bonus Wagering: ${percentage}% Complete
+            </div>
+            <div style="font-size: 11px; color: #ccc; margin-bottom: 8px;">
+              Wager ${remainingKES} KES more to unlock withdrawals.
+            </div>
+            <div style="background: #023436; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div style="background: linear-gradient(90deg, #03B5AA, #FF8552); height: 100%; width: ${percentage}%; border-radius: 4px; transition: width 0.5s ease;"></div>
+            </div>
           </div>
-          <div style="font-size: 11px; color: #ccc; margin-bottom: 8px;">
-            Wager ${remainingKES} KES more to unlock withdrawals.
+        `;
+      } else {
+        wageringEl.innerHTML = `
+          <div style="margin-top: 15px; padding: 12px; background: rgba(0, 168, 107, 0.1); border-radius: 8px; border-left: 4px solid #00a86b;">
+            <div style="font-size: 13px; color: #00a86b; font-weight: 600;">
+              ✅ Bonus Unlocked! You can withdraw freely.
+            </div>
           </div>
-          <div style="background: #023436; height: 8px; border-radius: 4px; overflow: hidden;">
-            <div style="background: linear-gradient(90deg, #03B5AA, #FF8552); height: 100%; width: ${percentage}%; border-radius: 4px; transition: width 0.5s ease;"></div>
-          </div>
-        </div>
-      `;
-    } else if (wageringEl) {
-      wageringEl.innerHTML = `
-        <div style="margin-top: 15px; padding: 12px; background: rgba(0, 168, 107, 0.1); border-radius: 8px; border-left: 4px solid #00a86b;">
-          <div style="font-size: 13px; color: #00a86b; font-weight: 600;">
-            ✅ Bonus Unlocked! You can withdraw freely.
-          </div>
-        </div>
-      `;
+        `;
+      }
     }
     // ----------------------------------------
 
