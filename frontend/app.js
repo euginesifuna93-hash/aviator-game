@@ -274,38 +274,47 @@ function initSocket() {
 // --- BETTING ---
 function handleBetAction(panelNum) {
   const bet = bets[panelNum];
+  
+  // ✅ FIX: Dynamically get the correct input for Panel 1 or Panel 2
   const stakeInput = document.getElementById(`stake-${panelNum}`);
-  const stake = parseFloat(stakeInput?.value) || 10;
+  let betAmountKES = parseFloat(stakeInput?.value) || 10;
 
   console.log('=== BET BUTTON CLICKED ===');
   console.log('Panel:', panelNum);
   console.log('Current phase:', gameState.phase);
   console.log('Bet already placed:', bet.placed);
   console.log('Bet status:', bet.status);
-  console.log('Stake:', stake, 'KES');
+  console.log('Stake:', betAmountKES, 'KES');
   console.log('Socket connected:', socket?.connected);
   console.log('User balance:', currentUser?.balanceCents);
 
-  // 1. CANCEL during betting phase
-  // 1. CANCEL during betting phase (INSTANT TOGGLE)
+  // ✅ 1. Enforce Maximum Bet of 200 KES
+  if (betAmountKES > 200) {
+      showToast('warning', "Maximum bet allowed is 200 KES!");
+      stakeInput.value = "200.00"; // Force the input back to 200
+      return; // Stop the bet from being placed
+  }
+
+  // ✅ 2. Enforce Minimum Bet of 1 KES
+  if (betAmountKES < 1 || isNaN(betAmountKES)) {
+      showToast('warning', "Minimum bet is 1 KES!");
+      stakeInput.value = "1.00";
+      return;
+  }
+
+  // 3. CANCEL during betting phase (INSTANT TOGGLE)
   if (gameState.phase === 'betting' && bet.placed && bet.status === 'pending') {
     console.log('→ Action: CANCEL bet (Instant)');
-    // Just cancel immediately without asking!
-    doCancel(panelNum, stake);
+    doCancel(panelNum, betAmountKES);
     return;
   }
 
-  // 2. PLACE BET during betting phase
+  // 4. PLACE BET during betting phase
   if (gameState.phase === 'betting' && !bet.placed) {
     console.log('→ Action: PLACE bet');
     
-    if (stake < 1) { 
-      showToast('warning', 'Minimum bet is 1.00 KES'); 
-      return; 
-    }
-    
-    if (!currentUser || currentUser.balanceCents < stake * 100) {
-      showToast('error', `Insufficient balance! Need ${stake.toFixed(2)} KES`);
+    if (!currentUser || currentUser.balanceCents < betAmountKES * 100) {
+      showToast('error', `Insufficient balance! Need ${betAmountKES.toFixed(2)} KES`);
       return;
     }
 
@@ -314,10 +323,9 @@ function handleBetAction(panelNum) {
       return;
     }
 
-    const stakeCents = Math.round(stake * 100);
+    const stakeCents = Math.round(betAmountKES * 100);
     console.log('Emitting bet:place with stakeCents:', stakeCents, 'Panel:', panelNum);
     
-    // ✅ ADD panel: panelNum HERE
     socket.emit('bet:place', { stakeCents, panel: panelNum }, (res) => {
       console.log('Bet response received:', res);
       if (res && res.ok) {
@@ -326,7 +334,7 @@ function handleBetAction(panelNum) {
         bet.stakeCents = res.bet.stakeCents;
         bet.status = 'pending';
         updateUI();
-        showToast('success', `🎯 Bet placed! ${stake.toFixed(2)} KES on Panel ${panelNum}`);
+        showToast('success', `🎯 Bet placed! ${betAmountKES.toFixed(2)} KES on Panel ${panelNum}`);
       } else {
         const errorMsg = res?.error || 'Bet failed';
         showToast('error', errorMsg);
@@ -335,7 +343,7 @@ function handleBetAction(panelNum) {
     return;
   }
 
-  // 3. CASH OUT during flying phase
+  // 5. CASH OUT during flying phase
   if (gameState.phase === 'flying' && bet.placed && bet.status === 'pending') {
     console.log('→ Action: CASH OUT');
     const currentMult = getCurrentMultiplier();
@@ -356,7 +364,7 @@ function handleBetAction(panelNum) {
     return;
   }
 
-  // 4. Nothing matched - show why
+  // 6. Nothing matched - show why
   console.log('⚠️ No action taken. Conditions not met:');
   if (gameState.phase !== 'betting' && gameState.phase !== 'flying') {
     showToast('warning', `Game is ${gameState.phase}. Wait for next round.`);
@@ -413,13 +421,24 @@ if (btn2) {
 }
 
 // Stake +/- buttons
+// Stake +/- buttons
 document.querySelectorAll('.stake-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const panel = btn.dataset.panel;
     const input = document.getElementById(`stake-${panel}`);
     if (!input) return;
+    
     const val = parseFloat(input.value) || 10;
-    input.value = (btn.classList.contains('plus') ? val + 1 : Math.max(1, val - 1)).toFixed(2);
+    
+    // Calculate new value (+1 or -1)
+    let newVal = btn.classList.contains('plus') ? val + 1 : Math.max(1, val - 1);
+    
+    // ✅ CAP IT AT 200 KES
+    if (newVal > 200) {
+        newVal = 200;
+    }
+    
+    input.value = newVal.toFixed(2);
   });
 });
 
