@@ -160,19 +160,32 @@ router.post('/withdraw', requireAuth, [
     const amountCents = Math.round(amount * 100);
     const idempotencyKey = `wd:${crypto.randomUUID()}`;
     const reference = `WD-${Date.now().toString().slice(-8)}`;
-
-    // --- WAGERING SHIELD: Check if bonus is unlocked ---
+    // --- SMART WAGERING SHIELD ---
     const [userWithBonus] = await db.query(
-      'SELECT wagering_required_cents FROM users WHERE id = ?', 
+      'SELECT balance_cents, bonus_balance_cents, wagering_required_cents FROM users WHERE id = ?', 
       [req.userId]
     );
     
-    if (userWithBonus[0].wagering_required_cents > 0) {
-      const remainingKES = (userWithBonus[0].wagering_required_cents / 100).toFixed(2);
-      throw new AppError(`🔒 Bonus locked! Please wager ${remainingKES} KES more before withdrawing.`, 400);
-    }
-    // -----------------------------------------------
+    const totalBalance = Number(userWithBonus[0].balance_cents);
+    const bonusBalance = Number(userWithBonus[0].bonus_balance_cents || 0);
+    const wageringRequired = Number(userWithBonus[0].wagering_required_cents || 0);
+    
+    // Calculate how much of their balance is ACTUALLY their own real money
+    const realMoneyBalance = totalBalance - bonusBalance; 
 
+    if (wageringRequired > 0) {
+      if (amountCents > realMoneyBalance) {
+        // They are trying to withdraw bonus winnings before meeting the requirement
+        const remainingKES = (wageringRequired / 100).toFixed(2);
+        const maxWithdrawKES = (realMoneyBalance / 100).toFixed(2);
+        throw new AppError(`🔒 Bonus locked! Please wager ${remainingKES} KES more to unlock winnings. (You can withdraw up to ${maxWithdrawKES} KES of your own deposited funds).`, 400);
+      } else {
+        // They are withdrawing their OWN real money. We allow it, but we FORFEIT the bonus!
+        // We will handle the bonus cancellation inside the transaction below.
+        req.forfeitBonus = true; 
+      }
+    }
+    // --------------------------------
     // 1. Check daily withdrawal limit (50,000 KES = 5,000,000 cents)
     const DAILY_WITHDRAWAL_LIMIT = 5000000; 
     const today = new Date().toISOString().split('T')[0];
@@ -189,6 +202,8 @@ router.post('/withdraw', requireAuth, [
       throw new AppError(`Daily withdrawal limit of ${DAILY_WITHDRAWAL_LIMIT / 100} KES exceeded`, 400);
     }
 
+
+
     let newBalance;
     await db.transaction(async (conn) => {
       const [user] = await conn.query('SELECT balance_cents FROM users WHERE id = ? FOR UPDATE', [req.userId]);
@@ -197,7 +212,22 @@ router.post('/withdraw', requireAuth, [
       }
       
       newBalance = Number(user[0].balance_cents) - amountCents;
-      await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [newBalance, req.userId]);
+      
+      // --- NEW: Handle Bonus Forfeiture ---
+      let bonusUpdateQuery = '';
+      let bonusUpdateValues = [];
+      
+      if (req.forfeitBonus) {
+        bonusUpdateQuery = ', bonus_balance_cents = 0, wagering_required_cents = 0';
+        bonusUpdateValues = [];
+        logger.info(`User ${req.userId} forfeited bonus to withdraw real funds.`);
+      }
+
+      await conn.query(
+        `UPDATE users SET balance_cents = ? ${bonusUpdateQuery} WHERE id = ?`, 
+        [newBalance, ...bonusUpdateValues, req.userId]
+      );
+      // ------------------------------------
       
       // 2. Insert ledger with status 'pending' (requires admin approval for real money safety)
       await conn.query(
@@ -206,7 +236,7 @@ router.post('/withdraw', requireAuth, [
         [req.userId, -amountCents, newBalance, idempotencyKey, JSON.stringify({ method, account, reference })]
       );
     });
-
+    
     logger.info(`Withdrawal requested: user=${req.userId}, amount=${amountCents}, method=${method}, account=${account}`);
 
     const { getIO } = require('../realtime');
