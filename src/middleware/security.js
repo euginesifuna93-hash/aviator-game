@@ -4,9 +4,9 @@ const express = require('express');
 const config = require('../config');
 
 // 1. Helmet: Sets secure HTTP headers (XSS protection, no sniffing, etc.)
+// Disable Content Security Policy to allow Socket.io and analytics to connect
 const helmetMiddleware = helmet({
-  contentSecurityPolicy: config.isProd ? undefined : false, // Disable strict CSP in dev for easier testing
-  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false, 
 });
 
 // 2. CORS: Strictly allow only our frontend origin

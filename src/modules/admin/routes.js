@@ -53,6 +53,54 @@ router.get('/game-state', requireAuth, requireAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// GET /api/admin/overview - The "God View" stats
+router.get('/overview', async (req, res) => {
+  try {
+    // 1. Get Total Users and Total Balance in the system
+    const [userStats] = await db.query(`
+      SELECT COUNT(*) as total_users, SUM(balance_cents) as total_system_balance 
+      FROM users
+    `);
+
+    // 2. Get Today's Financials (Deposits vs Withdrawals)
+    const [financials] = await db.query(`
+      SELECT 
+        SUM(CASE WHEN kind = 'deposit' THEN amount_cents ELSE 0 END) as today_deposits,
+        SUM(CASE WHEN kind = 'withdrawal' THEN amount_cents ELSE 0 END) as today_withdrawals
+      FROM ledger 
+      WHERE DATE(created_at) = CURDATE()
+    `);
+
+    // 3. Get Pending Withdrawals Count
+    const [pendingWithdrawals] = await db.query(`
+      SELECT COUNT(*) as count, SUM(amount_cents) as total_amount 
+      FROM withdrawals WHERE status = 'pending'
+    `);
+
+    // 4. Get Current Game State (from the engine)
+    const engine = require('../engine/engine');
+    const currentSnapshot = engine.snapshot();
+
+    res.json({
+      ok: true,
+      data: {
+        users: userStats[0],
+        financials: financials[0],
+        pendingWithdrawals: pendingWithdrawals[0],
+        liveGame: {
+          phase: currentSnapshot?.phase || 'waiting',
+          roundId: currentSnapshot?.roundId || null,
+          activeBets: currentSnapshot?.activeBetsCount || 0 // Assuming your engine tracks this
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Admin overview error:', err);
+    res.status(500).json({ error: 'Failed to load overview' });
+  }
+});
+
 // GET /api/admin/rounds
 router.get('/rounds', requireAuth, requireAdmin, async (req, res, next) => {
   try {
@@ -300,25 +348,38 @@ router.get('/game-settings', requireAuth, requireAdmin, async (req, res, next) =
   }
 });
 // PUT /api/admin/game-settings
-router.put('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
+// Example: router.get('/settings', async (req, res) => { ... })
+router.get('/settings', async (req, res) => {
   try {
-    const { house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed } = req.body;
+    const [rows] = await db.query('SELECT * FROM game_settings');
     
-    await db.query(`
-      INSERT INTO game_settings (id, house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed)
-      VALUES (1, ?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE 
-        house_edge = VALUES(house_edge),
-        max_crash = VALUES(max_crash),
-        min_bet = VALUES(min_bet),
-        max_bet = VALUES(max_bet),
-        betting_time = VALUES(betting_time),
-        flight_speed = VALUES(flight_speed)
-    `, [house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed]);
-    
-    logger.info('Game settings updated by admin');
-    res.json({ ok: true, message: 'Game settings updated' });
-  } catch (err) { next(err); }
+    // Transform the database rows into a simple object
+    // This turns [{setting_key: 'min_bet', setting_value: '100'}, ...] 
+    // into { min_bet: '100', max_bet: '2500000', ... }
+    const settingsObject = {};
+    rows.forEach(row => {
+      settingsObject[row.setting_key] = row.setting_value;
+    });
+
+    res.json({ ok: true, settings: settingsObject });
+  } catch (err) {
+    console.error('Settings error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET ALL USERS FOR MANAGEMENT
+router.get('/users', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT id, email, balance_cents, is_admin, created_at 
+      FROM users 
+      ORDER BY created_at DESC
+    `);
+    res.json({ ok: true, users: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 

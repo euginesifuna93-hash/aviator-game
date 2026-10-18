@@ -6,10 +6,16 @@ const engine = require('../engine/engine');
 let ioInstance = null;
 
 function initRealtime(httpServer, sessionMiddleware) {
+ 
+ 
   ioInstance = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin || origin.includes('localhost') || origin.includes('ngrok') || origin.includes('127.0.0.1')) {
+        if (!origin || 
+            origin.includes('localhost') || 
+            origin.includes('ngrok') || 
+            origin.includes('127.0.0.1') ||
+            origin.includes('onrender.com')) { // <--- ADD THIS LINE!
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
@@ -39,22 +45,23 @@ function initRealtime(httpServer, sessionMiddleware) {
 
     // Add this inside the ioInstance.on('connection', ...) callback, after the snapshot emit:
 
-socket.on('bet:place', async (payload, ack) => {
-    try {
-      const userId = socket.request.session?.userId;
-      if (!userId) {
-        return ack({ ok: false, error: 'Not authenticated' });
+    socket.on('bet:place', async (payload, ack) => {
+      try {
+        const userId = socket.request.session?.userId;
+        if (!userId) {
+          return ack({ ok: false, error: 'Not authenticated' });
+        }
+        
+        const betsService = require('../bets/service');
+        // Pass the panel number (1 or 2) to the service
+        const bet = await betsService.placeBet(userId, payload.stakeCents, payload.autoCashout, payload.panel); 
+        
+        ack({ ok: true, bet });
+      } catch (err) {
+        console.error('bet:place error:', err.message);
+        ack({ ok: false, error: err.message || 'Bet failed' });
       }
-      
-      const betsService = require('../bets/service');
-      const bet = await betsService.placeBet(userId, payload.stakeCents, payload.autoCashout);
-      
-      ack({ ok: true, bet });
-    } catch (err) {
-      console.error('bet:place error:', err.message);
-      ack({ ok: false, error: err.message || 'Bet failed' });
-    }
-  });
+    });
   
   socket.on('bet:cashout', async (payload, ack) => {
     try {
@@ -73,6 +80,7 @@ socket.on('bet:place', async (payload, ack) => {
     }
   });
   
+
   socket.on('bet:cancel', async (payload, ack) => {
     try {
       const userId = socket.request.session?.userId;
@@ -81,7 +89,8 @@ socket.on('bet:place', async (payload, ack) => {
       }
       
       const betsService = require('../bets/service');
-      const result = await betsService.cancelBet(userId, payload.roundId);
+      // Pass the betId here!
+      const result = await betsService.cancelBet(userId, payload.roundId, payload.betId); 
       
       ack({ ok: true, ...result });
     } catch (err) {

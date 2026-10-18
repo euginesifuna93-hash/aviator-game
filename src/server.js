@@ -72,9 +72,9 @@ const sessionConfig = {
   saveUninitialized: false,
   name: 'aviator.sid',
   cookie: {
-    secure: config.isProd, // <-- CHANGE THIS (true in production)
+    secure: config.isProd,  // Should be TRUE in production
     httpOnly: true,
-    sameSite: config.isProd ? 'none' : 'lax', // <-- CHANGE THIS
+    sameSite: config.isProd ? 'none' : 'lax',  // Should be 'none' in production
     maxAge: config.auth.sessionTtlHours * 60 * 60 * 1000,
   },
 };
@@ -92,7 +92,6 @@ app.use('/api/bets', betsRoutes);
 app.use('/api/rounds', roundsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/profile', profileRoutes);
-// ... inside the route registration section ...
 app.use('/api/profile', profileRoutes);
 app.use('/api/payments', paymentRoutes); // <--- MAKE SURE THIS IS HERE
 
