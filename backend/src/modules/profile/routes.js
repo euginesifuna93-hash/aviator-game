@@ -9,11 +9,15 @@ const { AppError, ValidationError } = require('../../utils/errors');
 const db = require('../../db/pool');
 const logger = require('../../utils/logger');
 
+
+
+// GET /api/profile/me — Get current user details
 // GET /api/profile/me — Get current user details
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const [users] = await db.query(
-      `SELECT id, email, balance_cents, is_admin, created_at, updated_at 
+      `SELECT id, email, balance_cents, is_admin, created_at, updated_at, 
+              bonus_balance_cents, wagering_required_cents 
        FROM users WHERE id = ?`,
       [req.userId]
     );
@@ -29,6 +33,9 @@ router.get('/me', requireAuth, async (req, res, next) => {
         isAdmin: Boolean(user.is_admin),
         createdAt: user.created_at,
         updatedAt: user.updated_at,
+        // ✅ NEW: Send bonus data to frontend
+        bonusBalanceCents: Number(user.bonus_balance_cents || 0),
+        wageringRequiredCents: Number(user.wagering_required_cents || 0),
       }
     });
   } catch (err) {
@@ -236,7 +243,7 @@ router.post('/withdraw', requireAuth, [
         [req.userId, -amountCents, newBalance, idempotencyKey, JSON.stringify({ method, account, reference })]
       );
     });
-    
+
     logger.info(`Withdrawal requested: user=${req.userId}, amount=${amountCents}, method=${method}, account=${account}`);
 
     const { getIO } = require('../realtime');
