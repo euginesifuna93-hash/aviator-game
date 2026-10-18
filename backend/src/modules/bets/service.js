@@ -25,6 +25,7 @@ async function placeBet(userId, stakeCents, autoCashout, panel = 1) {
   
     const betId = crypto.randomUUID();
     let finalBalance = 0;
+    let newWagering = 0; // NEW: Track the updated wagering requirement
 
     await db.transaction(async (conn) => {
       const [gs] = await conn.query('SELECT * FROM game_state WHERE id = 1 FOR UPDATE');
@@ -37,14 +38,27 @@ async function placeBet(userId, stakeCents, autoCashout, panel = 1) {
         throw new AppError('Insufficient balance', 400);
       }
   
-      // ✅ ADD THE PANEL COLUMN HERE
+      // --- NEW WAGERING SHIELD LOGIC ---
+      // If they have a bonus requirement, reduce it by the amount they are betting
+      newWagering = user[0].wagering_required_cents || 0;
+      if (newWagering > 0) {
+        newWagering = Math.max(0, newWagering - stakeCents); // Never go below 0
+      }
+      // ---------------------------------
+
       await conn.query(
         `INSERT INTO bets (id, round_id, user_id, stake_cents, auto_cashout, status, panel) VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
         [betId, currentRound.roundId, userId, stakeCents, autoCashout || null, panel]
       );
   
       finalBalance = user[0].balance_cents - stakeCents;
-      await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [finalBalance, userId]);
+      
+      // UPDATED: Now we update BOTH balance_cents AND wagering_required_cents in one safe query
+      await conn.query(
+        'UPDATE users SET balance_cents = ?, wagering_required_cents = ? WHERE id = ?', 
+        [finalBalance, newWagering, userId]
+      );
+      
       await conn.query(
         `INSERT INTO ledger (user_id, kind, amount_cents, balance_after_cents, idempotency_key) VALUES (?, 'stake', ?, ?, ?)`,
         [userId, -stakeCents, finalBalance, `stake:${betId}`]
@@ -61,7 +75,7 @@ async function placeBet(userId, stakeCents, autoCashout, panel = 1) {
     const io = getIO();
     if (io) {
       io.emit('live_bet_update');
-      io.to(`user:${userId}`).emit('wallet', { balanceCents: finalBalance });
+      io.to(`user:${userId}`).emit('wallet', { balanceCents: finalBalance, wageringRequiredCents: newWagering }); // Send updated wagering to frontend
     }
   
     return { id: betId, roundId: currentRound.roundId, stakeCents, status: 'pending', panel };
@@ -153,6 +167,7 @@ async function placeBet(userId, stakeCents, autoCashout, panel = 1) {
   }
 
 
+  
 async function getHistory(userId) {
   const [rows] = await db.query(`SELECT b.*, r.crash_point, r.crashed_at FROM bets b JOIN rounds r ON r.id = b.round_id WHERE b.user_id = ? ORDER BY b.created_at DESC LIMIT 50`, [userId]);
   return rows;

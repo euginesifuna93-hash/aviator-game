@@ -4,7 +4,6 @@ const db = require('../../db/pool');
 const { AppError, AuthenticationError } = require('../../utils/errors');
 
 const SALT_ROUNDS = 12;
-
 async function register(email, password) {
   const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
   if (existing.length > 0) throw new AppError('Email already registered', 409, 'DUPLICATE_EMAIL');
@@ -12,11 +11,23 @@ async function register(email, password) {
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
   const id = uuidv4();
 
+  // --- NEW PROTECTED BONUS LOGIC ---
+  const welcomeBonusCents = 1000; // 10 KES
+  const wageringMultiplier = 3;   // 3x requirement
+  const totalWageringRequired = welcomeBonusCents * wageringMultiplier; // 3000 cents (30 KES)
+
   await db.query(
-    'INSERT INTO users (id, email, password_hash, balance_cents) VALUES (?, ?, ?, 1000)',
-    [id, email, passwordHash]
+    // We now insert into the new wagering_required_cents column!
+    'INSERT INTO users (id, email, password_hash, balance_cents, bonus_balance_cents, wagering_required_cents) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, email, passwordHash, welcomeBonusCents, welcomeBonusCents, totalWageringRequired]
   );
-  return { id, email, balanceCents: 1000 };
+  
+  return { 
+    id, 
+    email, 
+    balanceCents: welcomeBonusCents,
+    wageringRequiredCents: totalWageringRequired // Send this back to frontend so we can show the progress bar
+  };
 }
 
 async function login(email, password) {

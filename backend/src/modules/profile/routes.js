@@ -161,6 +161,18 @@ router.post('/withdraw', requireAuth, [
     const idempotencyKey = `wd:${crypto.randomUUID()}`;
     const reference = `WD-${Date.now().toString().slice(-8)}`;
 
+    // --- WAGERING SHIELD: Check if bonus is unlocked ---
+    const [userWithBonus] = await db.query(
+      'SELECT wagering_required_cents FROM users WHERE id = ?', 
+      [req.userId]
+    );
+    
+    if (userWithBonus[0].wagering_required_cents > 0) {
+      const remainingKES = (userWithBonus[0].wagering_required_cents / 100).toFixed(2);
+      throw new AppError(`🔒 Bonus locked! Please wager ${remainingKES} KES more before withdrawing.`, 400);
+    }
+    // -----------------------------------------------
+
     // 1. Check daily withdrawal limit (50,000 KES = 5,000,000 cents)
     const DAILY_WITHDRAWAL_LIMIT = 5000000; 
     const today = new Date().toISOString().split('T')[0];
