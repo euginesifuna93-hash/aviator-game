@@ -5,19 +5,27 @@ const E = Math.pow(2, 52);
 
 // 1. Create a cache for settings so we don't query the database every millisecond
 let gameSettings = {
-  house_edge: 0.03, // Default 3%
-  max_crash: 1000.00 // Default 1000x
+  house_edge: 0.03, // Default 3% (0.03)
+  max_crash: 100.00 // Default 100x max
 };
 
-// 2. Function to load settings from your database
+// 2. Function to load settings from your key-value database correctly
 async function loadSettings() {
   try {
-    const [rows] = await db.query('SELECT house_edge, max_crash FROM game_settings WHERE id = 1');
-    if (rows.length > 0) {
-      gameSettings.house_edge = Number(rows[0].house_edge);
-      gameSettings.max_crash = Number(rows[0].max_crash);
-      console.log(`[Settings] Loaded: House Edge=${gameSettings.house_edge}, Max Crash=${gameSettings.max_crash}`);
-    }
+    // FIX: Query ALL key-value pairs, not just id = 1
+    const [rows] = await db.query('SELECT setting_key, setting_value FROM game_settings');
+    
+    // Convert rows into a simple object: { house_edge: '0.03', max_crash: '100.00', ... }
+    const settingsMap = {};
+    rows.forEach(row => {
+      settingsMap[row.setting_key] = row.setting_value;
+    });
+
+    // Update our cache with safe defaults if the DB values are missing or invalid
+    gameSettings.house_edge = Number(settingsMap.house_edge) || 0.03; 
+    gameSettings.max_crash = Number(settingsMap.max_crash) || 100.00; 
+    
+    console.log(`[Settings] Loaded: House Edge=${gameSettings.house_edge}, Max Crash=${gameSettings.max_crash}`);
   } catch (err) {
     console.error('[Settings] Failed to load, using defaults:', err.message);
   }
@@ -42,9 +50,10 @@ function crashPoint(serverSeed, clientSeed, nonce) {
   
   // USE THE DYNAMIC HOUSE EDGE FROM DATABASE
   if (random < gameSettings.house_edge) {
-    return 1.00;
+    return 1.00; // Instant crash
   }
   
+  // Standard Provably Fair Crash Formula
   const crash = Math.max(1.00, Math.floor((0.99 / (1 - random)) * 100) / 100);
   
   // USE THE DYNAMIC MAX CRASH FROM DATABASE
