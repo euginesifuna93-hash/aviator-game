@@ -92,7 +92,6 @@ app.use('/api/bets', betsRoutes);
 app.use('/api/rounds', roundsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/profile', profileRoutes);
-// ... inside the route registration section ...
 app.use('/api/profile', profileRoutes);
 app.use('/api/payments', paymentRoutes); // <--- MAKE SURE THIS IS HERE
 

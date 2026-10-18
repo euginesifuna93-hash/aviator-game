@@ -53,6 +53,54 @@ router.get('/game-state', requireAuth, requireAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+
+// GET /api/admin/overview - The "God View" stats
+router.get('/overview', async (req, res) => {
+  try {
+    // 1. Get Total Users and Total Balance in the system
+    const [userStats] = await db.query(`
+      SELECT COUNT(*) as total_users, SUM(balance_cents) as total_system_balance 
+      FROM users
+    `);
+
+    // 2. Get Today's Financials (Deposits vs Withdrawals)
+    const [financials] = await db.query(`
+      SELECT 
+        SUM(CASE WHEN kind = 'deposit' THEN amount_cents ELSE 0 END) as today_deposits,
+        SUM(CASE WHEN kind = 'withdrawal' THEN amount_cents ELSE 0 END) as today_withdrawals
+      FROM ledger 
+      WHERE DATE(created_at) = CURDATE()
+    `);
+
+    // 3. Get Pending Withdrawals Count
+    const [pendingWithdrawals] = await db.query(`
+      SELECT COUNT(*) as count, SUM(amount_cents) as total_amount 
+      FROM withdrawals WHERE status = 'pending'
+    `);
+
+    // 4. Get Current Game State (from the engine)
+    const engine = require('../engine/engine');
+    const currentSnapshot = engine.snapshot();
+
+    res.json({
+      ok: true,
+      data: {
+        users: userStats[0],
+        financials: financials[0],
+        pendingWithdrawals: pendingWithdrawals[0],
+        liveGame: {
+          phase: currentSnapshot?.phase || 'waiting',
+          roundId: currentSnapshot?.roundId || null,
+          activeBets: currentSnapshot?.activeBetsCount || 0 // Assuming your engine tracks this
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Admin overview error:', err);
+    res.status(500).json({ error: 'Failed to load overview' });
+  }
+});
+
 // GET /api/admin/rounds
 router.get('/rounds', requireAuth, requireAdmin, async (req, res, next) => {
   try {
