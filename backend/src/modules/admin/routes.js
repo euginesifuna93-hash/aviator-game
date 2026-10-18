@@ -369,5 +369,19 @@ router.put('/game-settings', requireAuth, requireAdmin, async (req, res, next) =
   } catch (err) { next(err); }
 });
 
+// GET ALL USERS FOR MANAGEMENT
+router.get('/users', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT id, email, balance_cents, is_admin, created_at 
+      FROM users 
+      ORDER BY created_at DESC
+    `);
+    res.json({ ok: true, users: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 module.exports = router;
