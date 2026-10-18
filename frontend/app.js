@@ -662,9 +662,9 @@ async function loadProfileData() {
     if (emailInput) emailInput.value = data.user.email;
 
     // --- WAGERING PROGRESS BAR LOGIC ---
+    // --- WAGERING PROGRESS BAR LOGIC (SIMPLIFIED) ---
     const wageringEl = document.getElementById('wagering-progress-container');
     if (wageringEl) {
-      // ✅ FIX: Check if wageringRequiredCents exists
       const wageringRequired = data.user.wageringRequiredCents || 0;
       
       if (wageringRequired > 0) {
@@ -675,11 +675,11 @@ async function loadProfileData() {
         
         wageringEl.innerHTML = `
           <div style="margin-top: 15px; padding: 12px; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 4px solid #FF8552;">
-            <div style="font-size: 13px; color: #FBF12; font-weight: 600; margin-bottom: 6px;">
-              🔒 Bonus Wagering: ${percentage}% Complete
+            <div style="font-size: 14px; color: #FBF12; font-weight: 600; margin-bottom: 6px;">
+              🔒 Bonus Progress: ${percentage}% Complete
             </div>
-            <div style="font-size: 11px; color: #ccc; margin-bottom: 8px;">
-              Wager ${remainingKES} KES more to unlock withdrawals.
+            <div style="font-size: 12px; color: #ccc; margin-bottom: 8px;">
+              Play <strong style="color: #fff;">${remainingKES} KES</strong> more to unlock your bonus for withdrawal.
             </div>
             <div style="background: #023436; height: 8px; border-radius: 4px; overflow: hidden;">
               <div style="background: linear-gradient(90deg, #03B5AA, #FF8552); height: 100%; width: ${percentage}%; border-radius: 4px; transition: width 0.5s ease;"></div>
@@ -689,7 +689,7 @@ async function loadProfileData() {
       } else {
         wageringEl.innerHTML = `
           <div style="margin-top: 15px; padding: 12px; background: rgba(0, 168, 107, 0.1); border-radius: 8px; border-left: 4px solid #00a86b;">
-            <div style="font-size: 13px; color: #00a86b; font-weight: 600;">
+            <div style="font-size: 14px; color: #00a86b; font-weight: 600;">
               ✅ Bonus Unlocked! You can withdraw freely.
             </div>
           </div>
