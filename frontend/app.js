@@ -799,7 +799,7 @@ document.getElementById('deposit-form')?.addEventListener('submit', async (e) =>
 async function processDeposit(amount, method) {
   // 1. Open Paystack Popup
   const handler = PaystackPop.setup({
-    key: 'pk_test_6fd8058cb2b68cc3b1087ae85001b14858b3e1c6', // REPLACE WITH YOUR TEST PUBLIC KEY from .env or dashboard
+    key: 'pk_live_a4b78a3f3ee3d2174b40754c72f441d154434060', // REPLACE WITH YOUR TEST PUBLIC KEY from .env or dashboard
     email: currentUser.email,
     amount: amount * 100, // Paystack uses cents/kobo
     currency: 'KES',
