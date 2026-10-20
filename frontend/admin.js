@@ -53,17 +53,18 @@ async function checkAdminAuth() {
     await loadLiveGame();
     
     // Set up auto-refresh
+    // Set up auto-refresh (Bulletproof version)
     if (gameInterval) clearInterval(gameInterval);
     if (finInterval) clearInterval(finInterval);
     
+    // We remove the "if" checks so it always polls in the background
     gameInterval = setInterval(() => {
-      if (currentTab === 'live-game') loadLiveGame();
-    }, 2000);
+      loadLiveGame(); 
+    }, 2000); // Updates every 2 seconds
     
     finInterval = setInterval(() => {
-      if (currentTab === 'financials') loadFinancials();
-    }, 5000);
-    
+      loadFinancials(); 
+    }, 5000); // Updates every 5 seconds
   } catch (e) {
     console.error('Auth error:', e);
     Swal.fire({ 
@@ -84,9 +85,13 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
-    currentTab = btn.dataset.tab;
+    
+    // Make sure your HTML buttons have data-tab="live-game", data-tab="financials", etc.
+    currentTab = btn.dataset.tab; 
+    
     document.getElementById(`tab-${currentTab}`).classList.add('active');
     
+    // ... rest of your code ...
     // Load data based on tab
     if (currentTab === 'financials') loadFinancials();
     if (currentTab === 'live-game') loadLiveGame();
