@@ -323,14 +323,15 @@ router.get('/recommendations', requireAuth, requireAdmin, async (req, res, next)
   } catch (err) { next(err); }
 });
 
-
-// ==========================================
 // GAME SETTINGS (Admin Controls)
 // ==========================================
-// GET /api/admin/game-settings
+
+// 1. GET: Read the current settings
 router.get('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const [settings] = await db.query('SELECT * FROM game_settings WHERE id = 1');
+    
+    // Return the settings, or defaults if the table is empty
     res.json({ 
       ok: true, 
       settings: settings[0] || {
@@ -347,38 +348,34 @@ router.get('/game-settings', requireAuth, requireAdmin, async (req, res, next) =
     next(err); 
   }
 });
-// PUT /api/admin/game-settings
-// Example: router.get('/settings', async (req, res) => { ... })
-router.get('/settings', async (req, res) => {
+
+// 2. PUT: SAVE the new settings to the database
+router.put('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const [rows] = await db.query('SELECT * FROM game_settings');
-    
-    // Transform the database rows into a simple object
-    // This turns [{setting_key: 'min_bet', setting_value: '100'}, ...] 
-    // into { min_bet: '100', max_bet: '2500000', ... }
-    const settingsObject = {};
-    rows.forEach(row => {
-      settingsObject[row.setting_key] = row.setting_value;
+    const { house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed } = req.body;
+
+    // Basic validation to ensure no nulls break the game
+    if (house_edge === undefined || max_crash === undefined || min_bet === undefined || max_bet === undefined) {
+      return res.status(400).json({ ok: false, error: 'Missing required settings' });
+    }
+
+    // Update the database row where id = 1
+    await db.query(
+      `UPDATE game_settings 
+       SET house_edge = ?, max_crash = ?, min_bet = ?, max_bet = ?, betting_time = ?, flight_speed = ? 
+       WHERE id = 1`,
+      [house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed]
+    );
+
+    console.log('✅ Game settings updated in database:', req.body);
+
+    res.json({ 
+      ok: true, 
+      message: 'Settings updated successfully!' 
     });
-
-    res.json({ ok: true, settings: settingsObject });
   } catch (err) {
-    console.error('Settings error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET ALL USERS FOR MANAGEMENT
-router.get('/users', async (req, res) => {
-  try {
-    const [rows] = await db.query(`
-      SELECT id, email, balance_cents, is_admin, created_at 
-      FROM users 
-      ORDER BY created_at DESC
-    `);
-    res.json({ ok: true, users: rows });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Game settings update error:', err);
+    next(err); 
   }
 });
 

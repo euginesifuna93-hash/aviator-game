@@ -772,8 +772,13 @@ document.getElementById('deposit-form')?.addEventListener('submit', async (e) =>
   e.preventDefault();
   const amount = parseFloat(document.getElementById('deposit-amount').value);
   const method = document.getElementById('deposit-method').value;
-  if (amount < 100) { showToast('warning', 'Minimum deposit is 100 KES'); return; }
-
+  
+  // ✅ CHANGE THIS TO 300
+  if (amount < 300) { 
+    showToast('warning', 'Minimum deposit is 300 KES'); 
+    return; 
+  }
+  // ... rest of the code remains the same ...
   if (typeof Swal !== 'undefined') {
     Swal.fire({
       title: 'Confirm Deposit',

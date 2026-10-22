@@ -1,4 +1,3 @@
-// backend/src/modules/profile/routes.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
@@ -9,15 +8,13 @@ const { AppError, ValidationError } = require('../../utils/errors');
 const db = require('../../db/pool');
 const logger = require('../../utils/logger');
 
-
-
-// GET /api/profile/me — Get current user details
-// GET /api/profile/me — Get current user details
+// ==========================================
+// 1. GET /api/profile/me — Get current user details
+// ==========================================
 router.get('/me', requireAuth, async (req, res, next) => {
   try {
     const [users] = await db.query(
-      `SELECT id, email, balance_cents, is_admin, created_at, updated_at, 
-              bonus_balance_cents, wagering_required_cents 
+      `SELECT id, email, balance_cents, is_admin, created_at, updated_at 
        FROM users WHERE id = ?`,
       [req.userId]
     );
@@ -33,9 +30,6 @@ router.get('/me', requireAuth, async (req, res, next) => {
         isAdmin: Boolean(user.is_admin),
         createdAt: user.created_at,
         updatedAt: user.updated_at,
-        // ✅ NEW: Send bonus data to frontend
-        bonusBalanceCents: Number(user.bonus_balance_cents || 0),
-        wageringRequiredCents: Number(user.wagering_required_cents || 0),
       }
     });
   } catch (err) {
@@ -43,7 +37,9 @@ router.get('/me', requireAuth, async (req, res, next) => {
   }
 });
 
-// PUT /api/profile/me — Update email/password
+// ==========================================
+// 2. PUT /api/profile/me — Update email/password
+// ==========================================
 router.put('/me', requireAuth, [
   body('email').optional().isEmail().normalizeEmail().trim(),
   body('currentPassword').optional().notEmpty(),
@@ -51,15 +47,12 @@ router.put('/me', requireAuth, [
 ], async (req, res, next) => {
   try {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError(errors.array()[0].msg);
-    }
+    if (!errors.isEmpty()) throw new ValidationError(errors.array()[0].msg);
 
     const { email, currentPassword, newPassword } = req.body;
     const updates = [];
     const params = [];
 
-    // Update email
     if (email) {
       const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email, req.userId]);
       if (existing.length > 0) throw new AppError('Email already in use', 409);
@@ -67,10 +60,8 @@ router.put('/me', requireAuth, [
       params.push(email);
     }
 
-    // Update password
     if (newPassword) {
       if (!currentPassword) throw new ValidationError('Current password required');
-      
       const [users] = await db.query('SELECT password_hash FROM users WHERE id = ?', [req.userId]);
       const isValid = await bcrypt.compare(currentPassword, users[0].password_hash);
       if (!isValid) throw new AppError('Current password is incorrect', 401);
@@ -85,26 +76,18 @@ router.put('/me', requireAuth, [
     params.push(req.userId);
     await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
 
-    // Fetch updated user
     const [users] = await db.query('SELECT id, email, balance_cents FROM users WHERE id = ?', [req.userId]);
-    const user = users[0];
-    
-    res.json({
-      ok: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        balanceCents: Number(user.balance_cents),
-      }
-    });
+    res.json({ ok: true, user: { id: users[0].id, email: users[0].email, balanceCents: Number(users[0].balance_cents) } });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/profile/deposit — Add balance (min 100 KES)
+// ==========================================
+// 3. POST /api/profile/deposit — Add balance (MIN 300 KES)
+// ==========================================
 router.post('/deposit', requireAuth, [
-  body('amount').isFloat({ min: 100 }).withMessage('Minimum deposit is 100 KES'),
+  body('amount').isFloat({ min: 300 }).withMessage('Minimum deposit is 300 KES'),
   body('method').isIn(['mpesa', 'bank', 'card']).withMessage('Invalid payment method'),
 ], async (req, res, next) => {
   try {
@@ -123,7 +106,6 @@ router.post('/deposit', requireAuth, [
       
       await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [newBalance, req.userId]);
       
-      // Added 'completed' status for instant deposits
       await conn.query(
         `INSERT INTO ledger (user_id, kind, amount_cents, balance_after_cents, idempotency_key, status, meta) 
          VALUES (?, 'deposit', ?, ?, ?, 'completed', ?)`,
@@ -131,31 +113,23 @@ router.post('/deposit', requireAuth, [
       );
     });
 
-    logger.info(`Deposit: user=${req.userId}, amount=${amountCents}, method=${method}`);
+    logger.info(`Deposit: user=${req.userId}, amount=${amount} KES, method=${method}`);
 
-    // Notify via socket
     const { getIO } = require('../realtime');
     const io = getIO();
     if (io) io.to(`user:${req.userId}`).emit('wallet', { balanceCents: newBalance });
 
-    res.json({
-      ok: true,
-      deposit: {
-        amount,
-        amountCents,
-        method,
-        reference,
-        newBalanceCents: newBalance,
-      }
-    });
+    res.json({ ok: true, deposit: { amount, amountCents, method, reference, newBalanceCents: newBalance } });
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/profile/withdraw — Withdraw balance (min 100 KES) WITH DAILY LIMIT
+// ==========================================
+// 4. POST /api/profile/withdraw — Withdraw balance (MAX 150 KES PER DAY)
+// ==========================================
 router.post('/withdraw', requireAuth, [
-  body('amount').isFloat({ min: 100 }).withMessage('Minimum withdrawal is 100 KES'),
+  body('amount').isFloat({ min: 50 }).withMessage('Minimum withdrawal is 50 KES'),
   body('method').isIn(['mpesa', 'bank']).withMessage('Invalid withdrawal method'),
   body('account').notEmpty().withMessage('Account number/phone required'),
 ], async (req, res, next) => {
@@ -167,50 +141,24 @@ router.post('/withdraw', requireAuth, [
     const amountCents = Math.round(amount * 100);
     const idempotencyKey = `wd:${crypto.randomUUID()}`;
     const reference = `WD-${Date.now().toString().slice(-8)}`;
-    // --- SMART WAGERING SHIELD ---
-    const [userWithBonus] = await db.query(
-      'SELECT balance_cents, bonus_balance_cents, wagering_required_cents FROM users WHERE id = ?', 
-      [req.userId]
-    );
-    
-    const totalBalance = Number(userWithBonus[0].balance_cents);
-    const bonusBalance = Number(userWithBonus[0].bonus_balance_cents || 0);
-    const wageringRequired = Number(userWithBonus[0].wagering_required_cents || 0);
-    
-    // Calculate how much of their balance is ACTUALLY their own real money
-    const realMoneyBalance = totalBalance - bonusBalance; 
 
-    if (wageringRequired > 0) {
-      if (amountCents > realMoneyBalance) {
-        // They are trying to withdraw bonus winnings before meeting the requirement
-        const remainingKES = (wageringRequired / 100).toFixed(2);
-        const maxWithdrawKES = (realMoneyBalance / 100).toFixed(2);
-        throw new AppError(`🔒 Bonus locked! Please wager ${remainingKES} KES more to unlock winnings. (You can withdraw up to ${maxWithdrawKES} KES of your own deposited funds).`, 400);
-      } else {
-        // They are withdrawing their OWN real money. We allow it, but we FORFEIT the bonus!
-        // We will handle the bonus cancellation inside the transaction below.
-        req.forfeitBonus = true; 
-      }
-    }
-    // --------------------------------
-    // 1. Check daily withdrawal limit (50,000 KES = 5,000,000 cents)
-    const DAILY_WITHDRAWAL_LIMIT = 5000000; 
-    const today = new Date().toISOString().split('T')[0];
+    // ✅ RULE 1: Check Daily Withdrawal Limit (150 KES = 15000 cents)
+    const DAILY_LIMIT_CENTS = 15000; 
     
     const [dailyWithdrawals] = await db.query(
       `SELECT COALESCE(SUM(ABS(amount_cents)), 0) as total FROM ledger 
        WHERE user_id = ? AND kind = 'withdrawal' 
-       AND DATE(created_at) = ? AND status IN ('pending', 'processing', 'completed')`,
-      [req.userId, today]
+       AND DATE(created_at) = CURDATE() AND status IN ('pending', 'processing', 'completed')`,
+      [req.userId]
     );
     
     const dailyTotal = Number(dailyWithdrawals[0].total || 0);
-    if (dailyTotal + amountCents > DAILY_WITHDRAWAL_LIMIT) {
-      throw new AppError(`Daily withdrawal limit of ${DAILY_WITHDRAWAL_LIMIT / 100} KES exceeded`, 400);
+    if (dailyTotal + amountCents > DAILY_LIMIT_CENTS) {
+      const remaining = ((DAILY_LIMIT_CENTS - dailyTotal) / 100).toFixed(2);
+      throw new AppError(`🚫 Daily limit reached! You can only withdraw ${remaining} KES more today.`, 400);
     }
 
-
-
+    // ✅ RULE 2: Process the withdrawal safely
     let newBalance;
     await db.transaction(async (conn) => {
       const [user] = await conn.query('SELECT balance_cents FROM users WHERE id = ? FOR UPDATE', [req.userId]);
@@ -220,23 +168,10 @@ router.post('/withdraw', requireAuth, [
       
       newBalance = Number(user[0].balance_cents) - amountCents;
       
-      // --- NEW: Handle Bonus Forfeiture ---
-      let bonusUpdateQuery = '';
-      let bonusUpdateValues = [];
+      // Update user balance
+      await conn.query('UPDATE users SET balance_cents = ? WHERE id = ?', [newBalance, req.userId]);
       
-      if (req.forfeitBonus) {
-        bonusUpdateQuery = ', bonus_balance_cents = 0, wagering_required_cents = 0';
-        bonusUpdateValues = [];
-        logger.info(`User ${req.userId} forfeited bonus to withdraw real funds.`);
-      }
-
-      await conn.query(
-        `UPDATE users SET balance_cents = ? ${bonusUpdateQuery} WHERE id = ?`, 
-        [newBalance, ...bonusUpdateValues, req.userId]
-      );
-      // ------------------------------------
-      
-      // 2. Insert ledger with status 'pending' (requires admin approval for real money safety)
+      // Record in ledger as 'pending' (requires your manual admin approval)
       await conn.query(
         `INSERT INTO ledger (user_id, kind, amount_cents, balance_after_cents, idempotency_key, status, meta) 
          VALUES (?, 'withdrawal', ?, ?, ?, 'pending', ?)`,
@@ -244,7 +179,7 @@ router.post('/withdraw', requireAuth, [
       );
     });
 
-    logger.info(`Withdrawal requested: user=${req.userId}, amount=${amountCents}, method=${method}, account=${account}`);
+    logger.info(`Withdrawal requested: user=${req.userId}, amount=${amount} KES, method=${method}`);
 
     const { getIO } = require('../realtime');
     const io = getIO();
@@ -256,10 +191,10 @@ router.post('/withdraw', requireAuth, [
         amount,
         amountCents,
         method,
-        account: account.replace(/(.{3}).*(.{3})/, '$1***$2'), // Mask account for security
+        account: account.replace(/(.{3}).*(.{3})/, '$1***$2'), // Mask for security
         reference,
         newBalanceCents: newBalance,
-        status: 'pending', // Inform frontend it's pending admin approval
+        status: 'pending',
       }
     });
   } catch (err) {
@@ -267,7 +202,9 @@ router.post('/withdraw', requireAuth, [
   }
 });
 
-// GET /api/profile/transactions — Recent transactions
+// ==========================================
+// 5. GET /api/profile/transactions — Recent transactions
+// ==========================================
 router.get('/transactions', requireAuth, async (req, res, next) => {
   try {
     const [txs] = await db.query(
