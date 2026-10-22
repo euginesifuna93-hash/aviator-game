@@ -117,9 +117,10 @@ router.get('/rounds', requireAuth, requireAdmin, async (req, res, next) => {
 // ==========================================
 
 // GET /api/admin/dashboard (All stats in one call)
+// GET /api/admin/dashboard (The Complete God View)
 router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    // 1. Get Financial Stats
+    // 1. Get Financial Stats from Ledger
     const [ledgerStats] = await db.query(`
       SELECT 
         COALESCE(SUM(CASE WHEN kind = 'deposit' AND status = 'completed' THEN amount_cents ELSE 0 END), 0) as total_deposits,
@@ -130,7 +131,7 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
       FROM ledger
     `);
 
-    // 2. Get User Stats SEPARATELY
+    // 2. Get User Stats SEPARATELY (This fixes the Total Users bug)
     const [userStats] = await db.query(`
       SELECT 
         COUNT(*) as total_users,
@@ -144,6 +145,25 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
       SELECT l.*, u.email FROM ledger l 
       JOIN users u ON l.user_id = u.id 
       WHERE l.kind = 'withdrawal' AND l.status = 'pending'
+      ORDER BY l.created_at ASC
+    `);
+
+    // ✅ 4. Get Recent Activity (This was missing!)
+    const [recentActivity] = await db.query(`
+      SELECT l.*, u.email FROM ledger l 
+      JOIN users u ON l.user_id = u.id 
+      ORDER BY l.id DESC LIMIT 20
+    `);
+
+    // ✅ 5. Get Revenue Data for Chart (This was missing!)
+    const [revenueData] = await db.query(`
+      SELECT DATE(created_at) as date,
+        COALESCE(SUM(CASE WHEN kind = 'deposit' THEN amount_cents ELSE 0 END), 0) as deposits,
+        COALESCE(SUM(CASE WHEN kind = 'withdrawal' AND status = 'completed' THEN ABS(amount_cents) ELSE 0 END), 0) as withdrawals
+      FROM ledger 
+      WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+      GROUP BY DATE(created_at) 
+      ORDER BY date ASC
     `);
 
     const s = ledgerStats[0];
@@ -165,7 +185,9 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
           activeUsers: Number(u.active_users || 0),
           userLiability: Number(u.total_user_balances || 0),
         },
+        recentActivity: recentActivity || [], // ✅ Sending activity to frontend
         pendingWithdrawals: pendingWithdrawals || [],
+        revenueData: revenueData || [],       // ✅ Sending chart data to frontend
       }
     });
   } catch (err) { 
