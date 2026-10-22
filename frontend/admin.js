@@ -156,29 +156,36 @@ async function loadFinancials() {
     }
     
     const s = data.data.stats;
-    document.getElementById('fin-money-in').textContent = (s.moneyIn / 100).toFixed(2);
-    document.getElementById('fin-money-out').textContent = (s.moneyOut / 100).toFixed(2);
+    
+    // ✅ NULL-SAFE: Use || 0 to handle undefined/null values
+    document.getElementById('fin-money-in').textContent = ((s.moneyIn || 0) / 100).toFixed(2);
+    document.getElementById('fin-money-out').textContent = ((s.moneyOut || 0) / 100).toFixed(2);
     
     const profitEl = document.getElementById('fin-profit');
-    profitEl.textContent = (s.houseProfit / 100).toFixed(2);
-    profitEl.style.color = s.houseProfit >= 0 ? '#00a86b' : '#e50051';
+    const profit = (s.houseProfit || 0) / 100;
+    profitEl.textContent = profit.toFixed(2);
+    profitEl.style.color = profit >= 0 ? '#00a86b' : '#e50051';
     
-    document.getElementById('fin-pending').textContent = (s.pendingWithdrawals / 100).toFixed(2);
-    document.getElementById('fin-bets').textContent = s.totalBets.toLocaleString();
-    document.getElementById('fin-users').textContent = s.totalUsers.toLocaleString();
-    document.getElementById('fin-active').textContent = s.activeUsers.toLocaleString();
-    document.getElementById('fin-liability').textContent = (s.userLiability / 100).toFixed(2);
+    document.getElementById('fin-pending').textContent = ((s.pendingWithdrawals || 0) / 100).toFixed(2);
+    document.getElementById('fin-bets').textContent = (s.totalBets || 0).toLocaleString();
+    document.getElementById('fin-users').textContent = (s.totalUsers || 0).toLocaleString();
+    document.getElementById('fin-active').textContent = (s.activeUsers || 0).toLocaleString();
+    document.getElementById('fin-liability').textContent = ((s.userLiability || 0) / 100).toFixed(2);
     
     // Update badge
-    const pendingCount = data.data.pendingWithdrawals.length;
+    const pendingCount = (data.data.pendingWithdrawals || []).length;
     const badge = document.getElementById('pending-badge');
-    badge.textContent = pendingCount;
-    badge.style.display = pendingCount > 0 ? 'inline' : 'none';
+    if (badge) {
+      badge.textContent = pendingCount;
+      badge.style.display = pendingCount > 0 ? 'inline' : 'none';
+    }
     
     renderActivity(data.data.recentActivity);
     renderRevenueChart(data.data.revenueData);
     renderProfitChart(s);
-  } catch (e) { console.error('Financials error:', e); }
+  } catch (e) { 
+    console.error('Financials error:', e); 
+  }
 }
 
 function renderActivity(activities) {
