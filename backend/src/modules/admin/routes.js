@@ -326,53 +326,64 @@ router.get('/recommendations', requireAuth, requireAdmin, async (req, res, next)
 // GAME SETTINGS (Admin Controls)
 // ==========================================
 
-// 1. GET: Read the current settings
+// ==========================================
+// GAME SETTINGS (Admin Controls) - KEY VALUE FIX
+// ==========================================
+
+// 1. GET: Read the current settings and format them for the frontend
 router.get('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const [settings] = await db.query('SELECT * FROM game_settings WHERE id = 1');
+    const [rows] = await db.query('SELECT * FROM game_settings');
     
-    // Return the settings, or defaults if the table is empty
-    res.json({ 
-      ok: true, 
-      settings: settings[0] || {
-        house_edge: 0.03,
-        max_crash: 1000,
-        min_bet: 100,
-        max_bet: 10000000,
-        betting_time: 11000,
-        flight_speed: 15000
+    // Default fallback values
+    const settingsObj = {
+      house_edge: 0.03, 
+      max_crash: 1000,
+      min_bet: 100,
+      max_bet: 100000,
+      betting_time: 11000
+    };
+
+    // Transform the key-value rows into a simple object the frontend can read
+    rows.forEach(row => {
+      if (row.setting_key && row.setting_value !== undefined) {
+        // Convert numeric strings to actual numbers
+        settingsObj[row.setting_key] = isNaN(row.setting_value) ? row.setting_value : Number(row.setting_value);
       }
+      if (row.house_edge) settingsObj.house_edge = Number(row.house_edge);
     });
+
+    res.json({ ok: true, settings: settingsObj });
   } catch (err) { 
     console.error('Game settings fetch error:', err);
     next(err); 
   }
 });
 
-// 2. PUT: SAVE the new settings to the database
+// 2. PUT: SAVE the new settings to the database using Key-Value logic
 router.put('/game-settings', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const { house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed } = req.body;
+    const { house_edge, max_crash, min_bet, max_bet, betting_time } = req.body;
 
-    // Basic validation to ensure no nulls break the game
-    if (house_edge === undefined || max_crash === undefined || min_bet === undefined || max_bet === undefined) {
-      return res.status(400).json({ ok: false, error: 'Missing required settings' });
-    }
+    // Helper function to safely Insert or Update a setting
+    const upsertSetting = async (key, value) => {
+      await db.query(
+        `INSERT INTO game_settings (setting_key, setting_value, description, house_edge) 
+         VALUES (?, ?, ?, ?) 
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), house_edge = VALUES(house_edge)`,
+        [key, String(value), `${key} setting`, house_edge]
+      );
+    };
 
-    // Update the database row where id = 1
-    await db.query(
-      `UPDATE game_settings 
-       SET house_edge = ?, max_crash = ?, min_bet = ?, max_bet = ?, betting_time = ?, flight_speed = ? 
-       WHERE id = 1`,
-      [house_edge, max_crash, min_bet, max_bet, betting_time, flight_speed]
-    );
+    // Save all settings to the database
+    await upsertSetting('max_crash', max_crash);
+    await upsertSetting('max_bet', max_bet);
+    await upsertSetting('min_bet', min_bet);
+    await upsertSetting('betting_time', betting_time);
 
-    console.log('✅ Game settings updated in database:', req.body);
+    console.log('✅ Game settings saved to DB:', req.body);
 
-    res.json({ 
-      ok: true, 
-      message: 'Settings updated successfully!' 
-    });
+    res.json({ ok: true, message: 'Settings updated successfully!' });
   } catch (err) {
     console.error('Game settings update error:', err);
     next(err); 
