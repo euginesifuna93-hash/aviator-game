@@ -119,82 +119,58 @@ router.get('/rounds', requireAuth, requireAdmin, async (req, res, next) => {
 // GET /api/admin/dashboard (All stats in one call)
 router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const [stats] = await db.query(`
+    // 1. Get Financial Stats
+    const [ledgerStats] = await db.query(`
       SELECT 
         COALESCE(SUM(CASE WHEN kind = 'deposit' AND status = 'completed' THEN amount_cents ELSE 0 END), 0) as total_deposits,
         COALESCE(SUM(CASE WHEN kind = 'withdrawal' AND status = 'completed' THEN ABS(amount_cents) ELSE 0 END), 0) as total_withdrawals_completed,
-        COALESCE(SUM(CASE WHEN kind = 'withdrawal' AND status = 'pending' THEN ABS(amount_cents) ELSE 0 END), 0) as total_withdrawals_pending,
         COALESCE(SUM(CASE WHEN kind = 'stake' THEN ABS(amount_cents) ELSE 0 END), 0) as total_staked,
         COALESCE(SUM(CASE WHEN kind = 'cashout' THEN amount_cents ELSE 0 END), 0) as total_cashed_out,
-        SUM(CASE WHEN kind = 'stake' THEN 1 ELSE 0 END) as total_bets_count,
-        (SELECT COUNT(*) FROM users) as total_users,
-        (SELECT COUNT(*) FROM users WHERE updated_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)) as active_users,
-        (SELECT COALESCE(SUM(balance_cents), 0) FROM users) as total_user_balances
+        COUNT(CASE WHEN kind = 'stake' THEN 1 END) as total_bets_count
       FROM ledger
     `);
 
-    const s = stats[0];
-    const houseProfit = s.total_staked - s.total_cashed_out;
-
-    // Recent activity
-    const [recentActivity] = await db.query(`
-      SELECT l.*, u.email FROM ledger l JOIN users u ON l.user_id = u.id ORDER BY l.created_at DESC LIMIT 50
+    // 2. Get User Stats SEPARATELY
+    const [userStats] = await db.query(`
+      SELECT 
+        COUNT(*) as total_users,
+        COUNT(CASE WHEN updated_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE) THEN 1 END) as active_users,
+        COALESCE(SUM(balance_cents), 0) as total_user_balances
+      FROM users
     `);
 
-    // Pending withdrawals
+    // 3. Get Pending Withdrawals
     const [pendingWithdrawals] = await db.query(`
-      SELECT l.*, u.email FROM ledger l JOIN users u ON l.user_id = u.id WHERE l.kind = 'withdrawal' AND l.status = 'pending' ORDER BY l.created_at ASC
+      SELECT l.*, u.email FROM ledger l 
+      JOIN users u ON l.user_id = u.id 
+      WHERE l.kind = 'withdrawal' AND l.status = 'pending'
     `);
 
-    // Revenue data for chart (last 7 days)
-    const [revenueData] = await db.query(`
-      SELECT DATE(created_at) as date,
-        SUM(CASE WHEN kind = 'deposit' AND status = 'completed' THEN amount_cents ELSE 0 END) as deposits,
-        SUM(CASE WHEN kind = 'withdrawal' AND status = 'completed' THEN ABS(amount_cents) ELSE 0 END) as withdrawals
-      FROM ledger WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date ASC
-    `);
-
-
-        // ... existing dashboard code ...
-
-    // ✅ NEW: Find High-Risk Users for Admin Alerts
-    const [highRiskUsers] = await db.query(`
-      SELECT id, email, risk_score, risk_level, balance_cents 
-      FROM users WHERE risk_level = 'HIGH' ORDER BY risk_score DESC LIMIT 10
-    `);
-
-    res.json({
-      ok: true,
-      data: {
-        stats: { /* ... your existing stats ... */ },
-        recentActivity,
-        pendingWithdrawals,
-        revenueData,
-        highRiskUsers: highRiskUsers // ✅ Send this to the frontend
-      }
-    });
+    const s = ledgerStats[0];
+    const u = userStats[0];
+    const houseProfit = (s.total_staked || 0) - (s.total_cashed_out || 0);
 
     res.json({
       ok: true,
       data: {
         stats: {
-          moneyIn: Number(s.total_deposits),
-          moneyOut: Number(s.total_withdrawals_completed),
-          pendingWithdrawals: Number(s.total_withdrawals_pending),
-          totalStaked: Number(s.total_staked),
-          totalCashedOut: Number(s.total_cashed_out),
+          moneyIn: Number(s.total_deposits || 0),
+          moneyOut: Number(s.total_withdrawals_completed || 0),
+          pendingWithdrawals: Number(pendingWithdrawals.reduce((sum, w) => sum + Math.abs(w.amount_cents), 0)),
+          totalStaked: Number(s.total_staked || 0),
+          totalCashedOut: Number(s.total_cashed_out || 0),
           houseProfit: houseProfit,
           totalBets: Number(s.total_bets_count || 0),
-          totalUsers: Number(s.total_users || 0),
-          activeUsers: Number(s.active_users || 0),
-          userLiability: Number(s.total_user_balances),
+          totalUsers: Number(u.total_users || 0),
+          activeUsers: Number(u.active_users || 0),
+          userLiability: Number(u.total_user_balances || 0),
         },
-        recentActivity,
-        pendingWithdrawals,
-        revenueData,
+        pendingWithdrawals: pendingWithdrawals || [],
       }
     });
-  } catch (err) { next(err); }
+  } catch (err) { 
+    next(err); 
+  }
 });
 
 // GET /api/admin/users
