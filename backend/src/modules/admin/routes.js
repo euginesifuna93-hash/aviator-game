@@ -154,6 +154,26 @@ router.get('/dashboard', requireAuth, requireAdmin, async (req, res, next) => {
       FROM ledger WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date ASC
     `);
 
+
+        // ... existing dashboard code ...
+
+    // ✅ NEW: Find High-Risk Users for Admin Alerts
+    const [highRiskUsers] = await db.query(`
+      SELECT id, email, risk_score, risk_level, balance_cents 
+      FROM users WHERE risk_level = 'HIGH' ORDER BY risk_score DESC LIMIT 10
+    `);
+
+    res.json({
+      ok: true,
+      data: {
+        stats: { /* ... your existing stats ... */ },
+        recentActivity,
+        pendingWithdrawals,
+        revenueData,
+        highRiskUsers: highRiskUsers // ✅ Send this to the frontend
+      }
+    });
+
     res.json({
       ok: true,
       data: {
